@@ -84,6 +84,9 @@ with st.sidebar:
         ORDER BY property_id
     """, conn)
 
+    # Fix column names (Snowflake returns uppercase)
+    properties_df.columns = properties_df.columns.str.lower()
+
     # Property selector
     selected_property = st.selectbox(
         "Select Property:",
@@ -126,6 +129,9 @@ with tab1:
         SELECT * FROM property_risk_scores 
         WHERE property_id = '{selected_property}'
     """, conn)
+
+    # Fix column names
+    prop_risk.columns = prop_risk.columns.str.lower()
 
     if not prop_risk.empty:
         risk_data = prop_risk.iloc[0]
@@ -179,6 +185,9 @@ with tab1:
             WHERE property_id = '{selected_property}'
             ORDER BY room_risk_score DESC
         """, conn)
+
+        # Fix column names
+        rooms_df.columns = rooms_df.columns.str.lower()
 
 
         # Display rooms table with color coding
@@ -243,6 +252,9 @@ with tab2:
             END
     """, conn)
 
+    # Fix column names
+    ai_results.columns = ai_results.columns.str.lower()
+
     if not ai_results.empty:
         # Summary Stats
         col1, col2, col3, col4 = st.columns(4)
@@ -275,7 +287,7 @@ with tab2:
             return colors.get(val, '')
 
 
-        styled_ai = ai_results.style.applymap(
+        styled_ai = ai_results.style.map(
             color_severity,
             subset=['severity']
         )
@@ -309,7 +321,11 @@ with tab3:
     prop_risk = pd.read_sql(f"""
         SELECT * FROM property_risk_scores 
         WHERE property_id = '{selected_property}'
-    """, conn).iloc[0]
+    """, conn)
+
+    # Fix column names
+    prop_risk.columns = prop_risk.columns.str.lower()
+    prop_risk = prop_risk.iloc[0]
 
     # Risk Score Gauge
     st.subheader("🎯 Overall Property Risk Score")
@@ -397,6 +413,9 @@ with tab4:
           AND entity_id = '{selected_property}'
     """, conn)
 
+    # Fix column names
+    summary_data.columns = summary_data.columns.str.lower()
+
     if not summary_data.empty:
         summary = summary_data.iloc[0]
 
@@ -421,6 +440,14 @@ with tab4:
 
         # Download Report Button
         st.subheader("💾 Export Report")
+
+        # Get property risk data for report
+        prop_risk_df = pd.read_sql(f"""
+            SELECT * FROM property_risk_scores 
+            WHERE property_id = '{selected_property}'
+        """, conn)
+        prop_risk_df.columns = prop_risk_df.columns.str.lower()
+        prop_risk = prop_risk_df.iloc[0]
 
         # Create report text
         report_text = f"""
@@ -465,24 +492,7 @@ RECOMMENDATIONS
             use_container_width=True
         )
     else:
-        st.warning("⚠️ No summary available. Generating...")
-
-        if st.button("🤖 Generate AI Summary Now"):
-            with st.spinner("Generating summary..."):
-                # Trigger summary generation
-                conn.cursor().execute(f"""
-                    INSERT INTO inspection_summaries (entity_type, entity_id, risk_score, risk_category, plain_language_summary)
-                    SELECT 
-                        'property',
-                        property_id,
-                        property_risk_score,
-                        property_risk_category,
-                        generate_property_summary(property_id)
-                    FROM property_risk_scores
-                    WHERE property_id = '{selected_property}'
-                """)
-                st.success("✅ Summary generated!")
-                st.rerun()
+        st.warning("⚠️ No summary available for this property.")
 
 # ============================================
 # FOOTER
