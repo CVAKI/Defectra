@@ -9,6 +9,9 @@ from datetime import datetime
 import uuid
 import numpy as np
 from gemini_intagration import analyze_image_with_gemini
+from pdf_report_generator import generate_pdf_report
+from translations import get_text
+from image_annotator import annotate_image_with_defects
 
 # ============================================
 # PAGE CONFIGURATION
@@ -19,6 +22,23 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="expanded"
 )
+
+# ============================================
+# SESSION STATE INITIALIZATION
+# ============================================
+if 'language' not in st.session_state:
+    st.session_state.language = 'english'
+if 'stored_images' not in st.session_state:
+    st.session_state.stored_images = []
+if 'stored_defects' not in st.session_state:
+    st.session_state.stored_defects = []
+if 'stored_property_data' not in st.session_state:
+    st.session_state.stored_property_data = {}
+# NEW: PDF generation flags
+if 'show_pdf_button' not in st.session_state:
+    st.session_state.show_pdf_button = False
+if 'current_property_id' not in st.session_state:
+    st.session_state.current_property_id = None
 
 # ============================================
 # ENHANCED CUSTOM CSS WITH ANIMATIONS
@@ -291,6 +311,16 @@ st.markdown("""
         font-weight: 600;
     }
 
+    /* Language Selector Card */
+    .language-card {
+        background: linear-gradient(135deg, rgba(255, 0, 255, 0.1) 0%, rgba(0, 128, 255, 0.1) 100%);
+        border: 2px solid rgba(255, 0, 255, 0.3);
+        border-radius: 12px;
+        padding: 1rem;
+        margin: 1rem 0;
+        text-align: center;
+    }
+
     /* Buttons */
     .stButton > button {
         background: linear-gradient(135deg, #00f5ff, #0080ff);
@@ -541,11 +571,30 @@ def analyze_image_with_ai(image):
 
 
 # ============================================
-# HEADER
+# HEADER WITH LANGUAGE SELECTOR
 # ============================================
 st.markdown('<h1 class="main-header">Defactra AI</h1>', unsafe_allow_html=True)
 st.markdown('<p class="subtitle">Intelligent Defect Detection & Property Risk Analysis Platform</p>',
             unsafe_allow_html=True)
+
+# Language selector in a prominent position
+col1, col2, col3 = st.columns([2, 1, 2])
+with col2:
+    st.markdown('<div class="language-card">', unsafe_allow_html=True)
+    language_options = {
+        '🇬🇧 English': 'english',
+        '🇮🇳 മലയാളം': 'malayalam',
+        '🇮🇳 हिंदी': 'hindi'
+    }
+    selected_lang = st.selectbox(
+        "🌐 Language",
+        options=list(language_options.keys()),
+        index=list(language_options.values()).index(st.session_state.language),
+        key='language_selector'
+    )
+    st.session_state.language = language_options[selected_lang]
+    st.markdown('</div>', unsafe_allow_html=True)
+
 st.markdown("---")
 
 # ============================================
@@ -704,13 +753,18 @@ if app_mode == "📸 New Inspection (Upload Images)":
                 # Process images
                 all_findings = []
                 non_property_count = 0
+                processed_images = []
 
                 progress_bar = st.progress(0)
                 for idx, uploaded_file in enumerate(uploaded_files):
                     progress_bar.progress((idx + 1) / len(uploaded_files))
 
                     # Read image
+                    uploaded_file.seek(0)
                     image = Image.open(uploaded_file)
+
+                    # CRITICAL: Store image copy for PDF generation
+                    processed_images.append(image.copy())
 
                     # Convert image to base64 for storage
                     image_base64 = image_to_base64(image)
@@ -718,7 +772,7 @@ if app_mode == "📸 New Inspection (Upload Images)":
                     # Get file size
                     uploaded_file.seek(0)
                     file_size_kb = len(uploaded_file.read()) / 1024
-                    uploaded_file.seek(0)  # Reset file pointer
+                    uploaded_file.seek(0)
 
                     # Get image format
                     image_format = image.format.lower() if image.format else 'png'
@@ -747,7 +801,6 @@ if app_mode == "📸 New Inspection (Upload Images)":
                         detection_id = f"DET{str(uuid.uuid4())[:6].upper()}"
                         finding_id = f"F{str(uuid.uuid4())[:6].upper()}"
 
-                        # Store AI detection
                         # Escape single quotes in description
                         escaped_description = detection["description"].replace("'", "''")
                         escaped_object = detection["detected_object"].replace("'", "''")
@@ -774,6 +827,26 @@ if app_mode == "📸 New Inspection (Upload Images)":
 
                 conn.commit()
                 progress_bar.empty()
+
+                # CRITICAL: Store data for PDF generation with flags
+                if len(all_findings) > 0:
+                    st.session_state.stored_property_data = {
+                        'property_id': property_id,
+                        'address': property_address,
+                        'city': property_city,
+                        'property_type': property_type,
+                        'bedrooms': int(bedrooms),
+                        'area_sqft': int(area_sqft),
+                        'year_built': int(year_built),
+                        'room_name': room_name,
+                        'overall_score': all_findings[0]['overall_score'],
+                        'usability': all_findings[0]['usability']
+                    }
+                    st.session_state.stored_defects = all_findings
+                    st.session_state.stored_images = processed_images
+                    # Set flags for PDF generation
+                    st.session_state.show_pdf_button = True
+                    st.session_state.current_property_id = property_id
 
                 # Success message
                 if non_property_count > 0:
@@ -884,9 +957,9 @@ if app_mode == "📸 New Inspection (Upload Images)":
                                 </div>
                                 """, unsafe_allow_html=True)
 
-                    st.markdown("---")
-                    st.info(
-                        f"📊 **Next Step:** Go to 'View Existing Reports' mode and select property **{property_id}** to see the full risk analysis and historical data!")
+                    # Force rerun to show PDF button
+                    st.rerun()
+
                 else:
                     st.error(
                         "❌ No valid property images were found. Please upload images of buildings, rooms, or property structures.")
@@ -894,6 +967,64 @@ if app_mode == "📸 New Inspection (Upload Images)":
             except Exception as e:
                 st.error(f"❌ Error: {e}")
                 conn.rollback()
+                import traceback
+
+                with st.expander("Error Details"):
+                    st.code(traceback.format_exc())
+
+    # PDF GENERATION SECTION - Shows AFTER analysis complete (outside the analyze button)
+    if st.session_state.show_pdf_button and st.session_state.stored_property_data:
+        st.markdown("---")
+        st.markdown('<div class="glass-card">', unsafe_allow_html=True)
+        st.subheader("📄 Download Professional Report")
+
+        col1, col2 = st.columns([2, 1])
+        with col1:
+            st.info(
+                f"📥 Ready to generate PDF for property: **{st.session_state.current_property_id}**")
+            st.caption(
+                f"Report includes {len(st.session_state.stored_images)} images and {len(st.session_state.stored_defects)} defects in {st.session_state.language.title()}")
+
+        with col2:
+            if st.button("🎨 Generate PDF Report", type="primary", use_container_width=True,
+                         key="new_inspection_pdf"):
+                with st.spinner(f"Generating report in {st.session_state.language}..."):
+                    try:
+                        # Generate PDF
+                        pdf_buffer = generate_pdf_report(
+                            property_data=st.session_state.stored_property_data,
+                            defects=st.session_state.stored_defects,
+                            images=st.session_state.stored_images,
+                            language=st.session_state.language
+                        )
+
+                        st.success("✅ Report generated successfully!")
+
+                        # Download button
+                        filename = f"Defactra_Report_{st.session_state.current_property_id}_{st.session_state.language}.pdf"
+                        st.download_button(
+                            label="⬇️ Download PDF Report",
+                            data=pdf_buffer.getvalue(),
+                            file_name=filename,
+                            mime="application/pdf",
+                            use_container_width=True,
+                            key="download_new_pdf"
+                        )
+
+                        st.balloons()
+
+                    except Exception as e:
+                        st.error(f"❌ Error generating PDF: {e}")
+                        import traceback
+
+                        with st.expander("Error Details"):
+                            st.code(traceback.format_exc())
+
+        st.markdown('</div>', unsafe_allow_html=True)
+
+        st.markdown("---")
+        st.info(
+            f"📊 **Next Step:** Go to 'View Existing Reports' mode and select property **{st.session_state.current_property_id}** to see the full risk analysis and historical data!")
 
 # ============================================
 # MODE 2: VIEW REPORTS
@@ -904,9 +1035,10 @@ elif app_mode == "📊 View Existing Reports":
     if selected_property is None:
         st.warning("⚠️ No properties available. Please use 'New Inspection' mode to upload images first.")
     else:
-        tab1, tab2, tab3, tab4 = st.tabs([
+        tab1, tab2, tab3, tab4, tab5 = st.tabs([
             "📊 Dashboard",
             "🤖 AI Detection",
+            "🖼️ Annotated Images",
             "📈 Risk Analysis",
             "📝 Summary Report"
         ])
@@ -1138,8 +1270,83 @@ elif app_mode == "📊 View Existing Reports":
 
             st.markdown('</div>', unsafe_allow_html=True)
 
-        # TAB 3: RISK ANALYSIS
+        # TAB 3: ANNOTATED IMAGES
         with tab3:
+            st.markdown('<div class="glass-card">', unsafe_allow_html=True)
+            st.header("🖼️ Annotated Inspection Images")
+
+            # Fetch images and defects for this property
+            images_df = pd.read_sql(f"""
+                SELECT 
+                    ui.upload_id,
+                    ui.room_name,
+                    ui.image_data,
+                    ui.upload_timestamp
+                FROM uploaded_images ui
+                WHERE ui.property_id = '{selected_property}'
+                ORDER BY ui.upload_timestamp DESC
+            """, conn)
+            images_df.columns = images_df.columns.str.lower()
+
+            if not images_df.empty:
+                st.info(f"📸 Found {len(images_df)} image(s) for this property")
+
+                for idx, img_row in images_df.iterrows():
+                    st.markdown(f"### 🏠 {img_row['room_name']} - Image {idx + 1}")
+                    st.caption(f"Uploaded: {img_row['upload_timestamp']}")
+
+                    # Get defects for this image
+                    defects_df = pd.read_sql(f"""
+                        SELECT 
+                            detected_object,
+                            severity,
+                            confidence_score,
+                            description
+                        FROM ai_detections
+                        WHERE upload_id = '{img_row['upload_id']}'
+                    """, conn)
+                    defects_df.columns = defects_df.columns.str.lower()
+
+                    # Convert defects to list format for annotator
+                    defects_list = []
+                    for _, defect in defects_df.iterrows():
+                        defects_list.append({
+                            'detected_object': defect['detected_object'],
+                            'severity': defect['severity'],
+                            'confidence_score': defect['confidence_score'],
+                            'location': f"Detected in {img_row['room_name']}",
+                            'description': defect['description']
+                        })
+
+                    try:
+                        # Decode base64 image
+                        image_data = base64.b64decode(img_row['image_data'])
+                        original_image = Image.open(io.BytesIO(image_data))
+
+                        # Annotate image with defects
+                        annotated_image = annotate_image_with_defects(
+                            original_image,
+                            defects_list,
+                            st.session_state.language
+                        )
+
+                        # Display annotated image
+                        st.image(annotated_image, use_container_width=True)
+
+                        # Show defect count
+                        st.caption(f"🔍 {len(defects_list)} defect(s) marked on this image")
+
+                    except Exception as e:
+                        st.error(f"Error displaying image: {e}")
+
+                    st.markdown("---")
+            else:
+                st.info("No images found for this property. Images may not have been stored during inspection.")
+
+            st.markdown('</div>', unsafe_allow_html=True)
+
+        # TAB 4: RISK ANALYSIS
+        with tab4:
             st.markdown('<div class="glass-card">', unsafe_allow_html=True)
             st.header("📈 Comprehensive Risk Analysis")
 
@@ -1246,8 +1453,8 @@ elif app_mode == "📊 View Existing Reports":
 
             st.markdown('</div>', unsafe_allow_html=True)
 
-        # TAB 4: SUMMARY REPORT
-        with tab4:
+        # TAB 5: SUMMARY REPORT WITH PDF DOWNLOAD
+        with tab5:
             st.markdown('<div class="glass-card">', unsafe_allow_html=True)
             st.header("📝 Executive Summary Report")
 
@@ -1310,7 +1517,131 @@ elif app_mode == "📊 View Existing Reports":
 
                 st.markdown("---")
 
-                # Download report button
+                # PDF Download Section
+                st.subheader("📄 Download Professional Report")
+
+                col1, col2 = st.columns([2, 1])
+                with col1:
+                    st.info(f"📥 Generate a comprehensive PDF report in {st.session_state.language.title()}")
+
+                with col2:
+                    if st.button("🎨 Generate PDF", type="primary", use_container_width=True, key="existing_report_pdf"):
+                        with st.spinner("Generating comprehensive report..."):
+                            try:
+                                # Prepare property data
+                                prop_data = {
+                                    'property_id': selected_property,
+                                    'address': prop['address'],
+                                    'city': prop['city'],
+                                    'property_type': prop['property_type'],
+                                    'bedrooms': int(prop['bedrooms']),
+                                    'area_sqft': int(prop['area_sqft']),
+                                    'year_built': int(prop['year_built']),
+                                    'room_name': 'Multiple Rooms',
+                                    'overall_score': int(risk['property_risk_score']),
+                                    'usability': risk['property_risk_category'].lower()
+                                }
+
+                                # Fetch defects
+                                defects_df = pd.read_sql(f"""
+                                    SELECT 
+                                        ad.detected_object,
+                                        ad.severity,
+                                        ad.confidence_score,
+                                        ad.description,
+                                        ui.room_name
+                                    FROM ai_detections ad
+                                    JOIN uploaded_images ui ON ad.upload_id = ui.upload_id
+                                    WHERE ui.property_id = '{selected_property}'
+                                    ORDER BY 
+                                        CASE ad.severity
+                                            WHEN 'critical' THEN 1
+                                            WHEN 'high' THEN 2
+                                            WHEN 'medium' THEN 3
+                                            WHEN 'low' THEN 4
+                                            ELSE 5
+                                        END
+                                """, conn)
+                                defects_df.columns = defects_df.columns.str.lower()
+
+                                defects = []
+                                for _, row in defects_df.iterrows():
+                                    defects.append({
+                                        'detected_object': row['detected_object'] or 'Issue Found',
+                                        'description': row['description'] or 'No description available',
+                                        'severity': row['severity'] or 'medium',
+                                        'confidence_score': row['confidence_score'] or 75.0,
+                                        'location': row['room_name'],
+                                        'repair_priority': 'routine',
+                                        'estimated_impact': 'Requires attention'
+                                    })
+
+                                # Fetch images
+                                images_df = pd.read_sql(f"""
+                                    SELECT image_data
+                                    FROM uploaded_images
+                                    WHERE property_id = '{selected_property}'
+                                    LIMIT 5
+                                """, conn)
+                                images_df.columns = images_df.columns.str.lower()
+
+                                images = []
+                                for _, img_row in images_df.iterrows():
+                                    try:
+                                        image_data = base64.b64decode(img_row['image_data'])
+                                        image = Image.open(io.BytesIO(image_data))
+                                        images.append(image)
+                                    except:
+                                        pass
+
+                                # If no images, create placeholder
+                                if not images:
+                                    placeholder = Image.new('RGB', (800, 600), color='#1a1a2e')
+                                    from PIL import ImageDraw, ImageFont
+
+                                    draw = ImageDraw.Draw(placeholder)
+                                    try:
+                                        font = ImageFont.truetype(
+                                            "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 40)
+                                    except:
+                                        font = ImageFont.load_default()
+                                    text = f"Property: {selected_property}\n{len(defects)} Defects Found"
+                                    draw.text((100, 250), text, fill='#00f5ff', font=font)
+                                    images = [placeholder]
+
+                                # Generate PDF
+                                pdf_buffer = generate_pdf_report(
+                                    property_data=prop_data,
+                                    defects=defects,
+                                    images=images,
+                                    language=st.session_state.language
+                                )
+
+                                st.success("✅ Report generated!")
+
+                                # Download button
+                                filename = f"Defactra_Report_{selected_property}_{st.session_state.language}.pdf"
+                                st.download_button(
+                                    label="⬇️ Download PDF Report",
+                                    data=pdf_buffer.getvalue(),
+                                    file_name=filename,
+                                    mime="application/pdf",
+                                    use_container_width=True,
+                                    key="download_existing_pdf"
+                                )
+
+                                st.balloons()
+
+                            except Exception as e:
+                                st.error(f"❌ Error: {e}")
+                                import traceback
+
+                                with st.expander("Error Details"):
+                                    st.code(traceback.format_exc())
+
+                st.markdown("---")
+
+                # Text report download
                 report_data = f"""
 PROPERTY INSPECTION REPORT
 Generated by Defactra AI
@@ -1346,7 +1677,7 @@ Powered by Defactra AI
 """
 
                 st.download_button(
-                    label="📥 Download Full Report",
+                    label="📥 Download Text Report",
                     data=report_data,
                     file_name=f"defactra_report_{selected_property}.txt",
                     mime="text/plain",
@@ -1365,5 +1696,6 @@ st.markdown("""
 <div class="footer">
     <p>🔍 Defactra AI | Powered by Snowflake & Google Gemini AI</p>
     <p>Advanced AI-powered defect detection with severity analysis and risk assessment</p>
+    <p>📄 Professional multilingual PDF reports available in English, Malayalam, and Hindi</p>
 </div>
 """, unsafe_allow_html=True)
