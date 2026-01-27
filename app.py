@@ -14,8 +14,8 @@ from gemini_intagration import analyze_image_with_gemini
 # PAGE CONFIGURATION
 # ============================================
 st.set_page_config(
-    page_title="Property Inspection AI",
-    page_icon="🏠",
+    page_title="Defactra AI",
+    page_icon="🔍",
     layout="wide",
     initial_sidebar_state="expanded"
 )
@@ -48,9 +48,28 @@ st.markdown("""
         -webkit-background-clip: text;
         -webkit-text-fill-color: transparent;
         animation: gradientShift 8s ease infinite;
-        letter-spacing: -0.02em;
+        letter-spacing: 0.05em;
         text-transform: uppercase;
         position: relative;
+    }
+
+    .main-header::before {
+        content: '🔍';
+        position: absolute;
+        left: 50%;
+        top: -40px;
+        transform: translateX(-50%);
+        font-size: 4rem;
+        animation: float 3s ease-in-out infinite;
+    }
+
+    @keyframes float {
+        0%, 100% {
+            transform: translateX(-50%) translateY(0px);
+        }
+        50% {
+            transform: translateX(-50%) translateY(-10px);
+        }
     }
 
     @keyframes gradientShift {
@@ -524,14 +543,23 @@ def analyze_image_with_ai(image):
 # ============================================
 # HEADER
 # ============================================
-st.markdown('<h1 class="main-header">🏠 Property Inspection AI</h1>', unsafe_allow_html=True)
-st.markdown('<p class="subtitle">AI-Powered Defect Detection & Comprehensive Risk Analysis</p>', unsafe_allow_html=True)
+st.markdown('<h1 class="main-header">Defactra AI</h1>', unsafe_allow_html=True)
+st.markdown('<p class="subtitle">Intelligent Defect Detection & Property Risk Analysis Platform</p>',
+            unsafe_allow_html=True)
 st.markdown("---")
 
 # ============================================
 # SIDEBAR WITH MODE SELECTION
 # ============================================
 with st.sidebar:
+    st.markdown("""
+    <div style='text-align: center; padding: 1rem 0;'>
+        <h2 style='color: #00f5ff; font-weight: 800; margin: 0;'>🔍 DEFACTRA</h2>
+        <p style='color: #a0a0ff; font-size: 0.8rem; margin: 0; letter-spacing: 0.2em;'>AI-POWERED INSPECTION</p>
+    </div>
+    """, unsafe_allow_html=True)
+
+    st.markdown("---")
     st.markdown("### 🔍 Navigation")
 
     app_mode = st.radio(
@@ -583,8 +611,9 @@ with st.sidebar:
 
 if app_mode == "📸 New Inspection (Upload Images)":
     st.markdown('<div class="glass-card">', unsafe_allow_html=True)
-    st.header("📸 New Property Inspection with AI")
-    st.info("👉 Upload property images and let AI detect defects automatically with detailed severity analysis!")
+    st.header("📸 New Property Inspection with Defactra AI")
+    st.info(
+        "👉 Upload property images and let Defactra AI detect defects automatically with detailed severity analysis!")
     st.markdown('</div>', unsafe_allow_html=True)
 
     # Property Information Form
@@ -641,14 +670,15 @@ if app_mode == "📸 New Inspection (Upload Images)":
     st.markdown('</div>', unsafe_allow_html=True)
 
     # Analyze Button
-    if uploaded_files and st.button("🤖 Analyze with AI & Generate Report", type="primary", use_container_width=True):
+    if uploaded_files and st.button("🤖 Analyze with Defactra AI & Generate Report", type="primary",
+                                    use_container_width=True):
 
         # Validation
         if not property_address or not room_name:
             st.error("⚠️ Please fill in Property Address and Room Name")
             st.stop()
 
-        with st.spinner("🔍 AI is analyzing your images... This may take a moment..."):
+        with st.spinner("🔍 Defactra AI is analyzing your images... This may take a moment..."):
 
             # Generate IDs
             property_id = f"P{str(uuid.uuid4())[:6].upper()}"
@@ -781,7 +811,7 @@ if app_mode == "📸 New Inspection (Upload Images)":
 
                     # Show detailed findings
                     st.markdown("---")
-                    st.subheader("🔍 Comprehensive AI Detection Results")
+                    st.subheader("🔍 Comprehensive Defactra AI Detection Results")
 
                     # Group by severity
                     critical = [f for f in all_findings if f['severity'] == 'critical']
@@ -988,7 +1018,7 @@ elif app_mode == "📊 View Existing Reports":
 st.markdown("---")
 st.markdown("""
 <div class="footer">
-    <p>🏠 Property Inspection AI | Powered by Snowflake & Google Gemini AI</p>
-    <p>Real AI-powered defect detection with severity analysis and usability ratings</p>
+    <p>🔍 Defactra AI | Powered by Snowflake & Google Gemini AI</p>
+    <p>Advanced AI-powered defect detection with severity analysis and risk assessment</p>
 </div>
 """, unsafe_allow_html=True)
