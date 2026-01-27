@@ -8,6 +8,7 @@ import base64
 from datetime import datetime
 import uuid
 import numpy as np
+from gemini_intagration import analyze_image_with_gemini  # ← ADDED THIS LINE
 
 # ============================================
 # PAGE CONFIGURATION
@@ -101,139 +102,14 @@ def image_to_base64(image):
     return base64.b64encode(buffered.getvalue()).decode()
 
 
+# ============================================
+# REPLACED FUNCTION - NOW USES REAL GEMINI AI
+# ============================================
 def analyze_image_with_ai(image):
     """
-    Enhanced AI-Powered Property Defect Detection
-
-    This function analyzes property images for defects and validates if the image
-    is property-related. In production, integrate with Claude Vision API or similar.
+    AI-Powered Property Inspection using FREE Google Gemini API
     """
-
-    # Convert to numpy array for analysis
-    img_array = np.array(image)
-    height, width = img_array.shape[:2]
-
-    # Image characteristics
-    avg_brightness = np.mean(img_array)
-    color_variance = np.std(img_array)
-
-    # Check if image might be property-related (basic heuristic)
-    # In production, use actual AI vision model
-    is_likely_property = True  # Default assumption
-
-    # Very basic non-property detection (improve with real AI)
-    # Check for extremely unusual characteristics
-    if avg_brightness > 250 or avg_brightness < 5:
-        is_likely_property = False
-
-    if not is_likely_property:
-        return {
-            "is_property": False,
-            "message": "⚠️ This image does not appear to be property-related. Please upload images of buildings, rooms, or property structures.",
-            "overall_condition_score": 0,
-            "usability_rating": "N/A",
-            "overall_assessment": "Not a property image",
-            "detections": []
-        }
-
-    # Simulate comprehensive defect detection
-    # In production, replace with actual AI vision API call
-    detections = []
-
-    # Analyze image features to make intelligent guesses
-    # This is a placeholder - replace with real AI model
-
-    # Check brightness issues
-    if avg_brightness < 70:
-        detections.append({
-            "detected_object": "Poor Lighting / Dark Areas",
-            "confidence_score": 75.0,
-            "severity": "low",
-            "location": "Overall image",
-            "description": "Image shows poor lighting conditions which may indicate inadequate lighting fixtures or natural light. May also hide other defects.",
-            "repair_priority": "routine",
-            "estimated_impact": "May affect visibility of other issues and room usability"
-        })
-
-    # Check for potential dampness (darker spots in lighter areas)
-    if color_variance > 70:
-        detections.append({
-            "detected_object": "Potential Surface Discoloration",
-            "confidence_score": 60.0,
-            "severity": "medium",
-            "location": "Various areas detected",
-            "description": "Detected areas with color variations that may indicate water damage, dampness, mold growth, or paint deterioration. Requires closer inspection.",
-            "repair_priority": "urgent",
-            "estimated_impact": "May lead to structural damage or health issues if related to moisture"
-        })
-
-    # Analyze image quality
-    if width < 800 or height < 600:
-        detections.append({
-            "detected_object": "Low Image Resolution",
-            "confidence_score": 95.0,
-            "severity": "low",
-            "location": "Entire image",
-            "description": "Image resolution is below optimal standards for detailed defect detection. Higher resolution images recommended for accurate inspection.",
-            "repair_priority": "cosmetic",
-            "estimated_impact": "Limits accuracy of automated defect detection"
-        })
-
-    # If no specific defects detected, provide baseline assessment
-    if len(detections) == 0:
-        detections.append({
-            "detected_object": "No Major Visible Defects",
-            "confidence_score": 70.0,
-            "severity": "low",
-            "location": "General inspection",
-            "description": "Visual analysis did not reveal any obvious major defects in this image. However, this does not rule out hidden structural issues, internal system problems, or defects not visible from this angle.",
-            "repair_priority": "routine",
-            "estimated_impact": "Minimal visible impact - recommend professional inspection for comprehensive assessment"
-        })
-
-    # Calculate overall condition score based on detections
-    if len([d for d in detections if d['severity'] == 'critical']) > 0:
-        overall_score = 35
-        usability = "poor - immediate attention required"
-    elif len([d for d in detections if d['severity'] == 'high']) > 0:
-        overall_score = 55
-        usability = "fair - repairs needed soon"
-    elif len([d for d in detections if d['severity'] == 'medium']) > 0:
-        overall_score = 75
-        usability = "good - routine maintenance recommended"
-    else:
-        overall_score = 90
-        usability = "excellent - minor or no issues"
-
-    # Generate overall assessment
-    critical_count = len([d for d in detections if d['severity'] == 'critical'])
-    high_count = len([d for d in detections if d['severity'] == 'high'])
-    medium_count = len([d for d in detections if d['severity'] == 'medium'])
-    low_count = len([d for d in detections if d['severity'] == 'low'])
-
-    if critical_count > 0:
-        assessment = f"⚠️ CRITICAL: Found {critical_count} critical issue(s) requiring immediate attention. Property may be unsafe for occupation."
-    elif high_count > 0:
-        assessment = f"⚠️ HIGH PRIORITY: Detected {high_count} significant defect(s) requiring urgent repairs to prevent further damage."
-    elif medium_count > 0:
-        assessment = f"✓ MODERATE: Found {medium_count} medium-priority issue(s). Property is usable but requires timely maintenance."
-    else:
-        assessment = f"✓ GOOD: Property appears in acceptable condition with only {low_count} minor issue(s) detected. Regular maintenance recommended."
-
-    return {
-        "is_property": True,
-        "overall_condition_score": overall_score,
-        "usability_rating": usability,
-        "overall_assessment": assessment,
-        "defects_summary": {
-            "critical": critical_count,
-            "high": high_count,
-            "medium": medium_count,
-            "low": low_count,
-            "total": len(detections)
-        },
-        "detections": detections
-    }
+    return analyze_image_with_gemini(image)
 
 
 # ============================================
@@ -396,7 +272,7 @@ if app_mode == "📸 New Inspection (Upload Images)":
                     # Read image
                     image = Image.open(uploaded_file)
 
-                    # AI Analysis
+                    # AI Analysis - NOW USES REAL GEMINI AI!
                     analysis_result = analyze_image_with_ai(image)
 
                     # Check if property image
@@ -653,8 +529,7 @@ elif app_mode == "📊 View Existing Reports":
             else:
                 st.info("No risk analysis data available for this property yet.")
 
-        # TAB 2, 3, 4 - Keep your existing code for these tabs
-        # [Copy your existing code for these tabs here]
+        # TAB 2, 3, 4 - Add your remaining tabs here if needed
 
 # ============================================
 # FOOTER
@@ -662,7 +537,7 @@ elif app_mode == "📊 View Existing Reports":
 st.markdown("---")
 st.markdown("""
 <div style='text-align: center; color: #666; padding: 1rem;'>
-    <p>🏠 Property Inspection AI | Powered by Snowflake & AI Vision</p>
-    <p>Comprehensive defect detection with severity analysis and usability ratings</p>
+    <p>🏠 Property Inspection AI | Powered by Snowflake & Google Gemini AI (FREE)</p>
+    <p>Real AI-powered defect detection with severity analysis and usability ratings</p>
 </div>
 """, unsafe_allow_html=True)
