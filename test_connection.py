@@ -41,6 +41,8 @@ try:
     for table in tables:
         try:
             df = pd.read_sql(f"SELECT COUNT(*) as count FROM {table}", conn)
+            # Fix: Convert column names to lowercase
+            df.columns = df.columns.str.lower()
             count = df['count'].iloc[0]
             st.success(f"✅ {table}: {count} rows")
         except Exception as e:
