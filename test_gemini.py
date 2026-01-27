@@ -1,165 +1,81 @@
 """
-Quick Test Script for Gemini API
-================================
-
-Run this to verify your Gemini API is working before using it in the main app.
-
-Usage:
-    python test_gemini.py
+Final Working Gemini API Test Script
+Corrected syntax for Gemini 2.5
 """
 
-import streamlit as st
-import google.generativeai as genai
+from google import genai
+from google.genai import types
 from PIL import Image
 import io
 
-st.set_page_config(page_title="Gemini API Test", page_icon="🧪", layout="wide")
+# Your API key
+API_KEY = "AIzaSyD0uUbukq6B5nJrdRclsy4TuUlw91Hosgk"
 
-st.title("🧪 Gemini API Connection Test")
-st.markdown("---")
-
-# Step 1: Check for API key
-st.header("Step 1: API Key Check")
+print("=" * 70)
+print("Testing Gemini API Connection - Gemini 2.5")
+print("=" * 70)
+print()
 
 try:
-    api_key = st.secrets["gemini"]["api_key"]
-    st.success(f"✅ API Key found: {api_key[:20]}...{api_key[-4:]}")
-    key_found = True
+    # Initialize client
+    print("1. Initializing Gemini client...")
+    client = genai.Client(api_key=API_KEY)
+    print("   ✅ Client initialized successfully")
+    print()
+
+    # Test text generation
+    print("2. Testing text generation...")
+    response = client.models.generate_content(
+        model='gemini-2.5-flash',
+        contents="Say 'Hello! I am working!' if you can read this."
+    )
+    print(f"   ✅ Response: {response.text}")
+    print()
+
+    # Test with image - CORRECTED SYNTAX
+    print("3. Testing image analysis...")
+    # Create a simple test image (red square)
+    test_img = Image.new('RGB', (100, 100), color='red')
+
+    # Convert to bytes
+    img_byte_arr = io.BytesIO()
+    test_img.save(img_byte_arr, format='PNG')
+    img_byte_arr = img_byte_arr.getvalue()
+
+    # Test image analysis with corrected syntax
+    response = client.models.generate_content(
+        model='gemini-2.5-flash',
+        contents=[
+            "What is the main color in this image? Answer in one word.",
+            types.Part.from_bytes(
+                data=img_byte_arr,
+                mime_type="image/png"
+            )
+        ]
+    )
+    print(f"   ✅ Image analysis response: {response.text}")
+    print()
+
+    print("=" * 70)
+    print("🎉 SUCCESS! Your Gemini API is working perfectly!")
+    print("=" * 70)
+    print()
+    print("✅ Working model: gemini-2.5-flash")
+    print()
+    print("Next steps:")
+    print("1. Replace your gemini_intagration.py with the updated version")
+    print("2. Verify your .streamlit/secrets.toml has the correct API key")
+    print("3. Run: streamlit run app.py")
+    print()
+    print("Your property inspection AI is ready to use! 🏠")
+    print()
+
 except Exception as e:
-    st.error("❌ API Key NOT found in secrets!")
-    st.info("""
-    Please add your API key to `.streamlit/secrets.toml`:
-
-    [gemini]
-    api_key = "your-api-key-here"
-
-    Get your FREE key at: https://makersuite.google.com/app/apikey
-    """)
-    key_found = False
-
-st.markdown("---")
-
-# Step 2: Test connection
-if key_found:
-    st.header("Step 2: Connection Test")
-
-    if st.button("🔌 Test Connection", type="primary"):
-        with st.spinner("Testing connection..."):
-            try:
-                genai.configure(api_key=api_key)
-                model = genai.GenerativeModel('gemini-1.5-flash')
-
-                response = model.generate_content("Say 'Hello! I'm working!' if you can read this.")
-
-                if response.text:
-                    st.success("✅ Connection Successful!")
-                    st.info(f"Gemini Response: {response.text}")
-                else:
-                    st.error("❌ Received empty response")
-
-            except Exception as e:
-                st.error(f"❌ Connection Failed: {e}")
-
-                # Provide specific error guidance
-                error_str = str(e)
-                if "API_KEY_INVALID" in error_str:
-                    st.warning("🔑 Your API key appears to be invalid.")
-                    st.info("Get a new one at: https://makersuite.google.com/app/apikey")
-                elif "QUOTA_EXCEEDED" in error_str:
-                    st.warning("⏰ Rate limit exceeded. Wait a minute and try again.")
-                    st.info("Free tier: 60 requests/minute, 1500/day")
-                else:
-                    st.info("Check your internet connection and API key.")
-
-    st.markdown("---")
-
-    # Step 3: Test with image
-    st.header("Step 3: Vision Test with Property Image")
-
-    st.info("Upload a property image to test AI vision detection")
-
-    test_image = st.file_uploader("Upload test image", type=['png', 'jpg', 'jpeg'])
-
-    if test_image:
-        image = Image.open(test_image)
-        col1, col2 = st.columns(2)
-
-        with col1:
-            st.image(image, caption="Your test image", use_container_width=True)
-
-        with col2:
-            if st.button("🤖 Analyze with Gemini AI", type="primary"):
-                with st.spinner("AI is analyzing..."):
-                    try:
-                        genai.configure(api_key=api_key)
-                        model = genai.GenerativeModel('gemini-1.5-flash')
-
-                        prompt = """Analyze this image briefly. Is it a property/building/room image? 
-                        If yes, list 2-3 main observations about the condition.
-                        If no, say what it is instead.
-                        Keep response under 100 words."""
-
-                        response = model.generate_content([prompt, image])
-
-                        st.success("✅ Analysis Complete!")
-                        st.markdown("**AI Response:**")
-                        st.write(response.text)
-
-                        st.balloons()
-
-                    except Exception as e:
-                        st.error(f"❌ Analysis Failed: {e}")
-
-st.markdown("---")
-
-# Step 4: System info
-st.header("Step 4: System Information")
-
-col1, col2 = st.columns(2)
-
-with col1:
-    try:
-        import google.generativeai
-
-        st.success(f"✅ google-generativeai installed: v{google.generativeai.__version__}")
-    except ImportError:
-        st.error("❌ google-generativeai NOT installed")
-        st.code("pip install google-generativeai")
-
-with col2:
-    try:
-        import PIL
-
-        st.success(f"✅ Pillow installed: v{PIL.__version__}")
-    except ImportError:
-        st.error("❌ Pillow NOT installed")
-        st.code("pip install pillow")
-
-st.markdown("---")
-
-# Final status
-st.header("📊 Final Status")
-
-if key_found:
-    st.success("""
-    ✅ **All checks passed!**
-
-    You're ready to use Gemini AI in your property inspection app!
-
-    Next steps:
-    1. Copy `gemini_vision_integration.py` to your project
-    2. Update `app_improved.py` to use Gemini
-    3. Run: `streamlit run app_improved.py`
-    """)
-else:
-    st.warning("""
-    ⚠️ **Setup incomplete**
-
-    Please:
-    1. Get API key from: https://makersuite.google.com/app/apikey
-    2. Add it to `.streamlit/secrets.toml`
-    3. Refresh this page
-    """)
-
-st.markdown("---")
-st.caption("🏠 Property Inspection AI - Powered by Google Gemini (FREE)")
+    print(f"❌ ERROR: {e}")
+    print()
+    print("Troubleshooting:")
+    print("- Check your API key is valid")
+    print("- Make sure you have internet connection")
+    print("- Verify the API key at: https://aistudio.google.com/app/apikey")
+    print("- Try running: pip install --upgrade google-genai")
+    print()

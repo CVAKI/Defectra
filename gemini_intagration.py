@@ -2,22 +2,17 @@
 Google Gemini Vision API Integration for Property Inspection
 ============================================================
 
-This module provides a FREE AI-powered property defect detection using Google's Gemini API.
-Gemini offers generous free tier limits, making it perfect for property inspection.
+Updated to use Gemini 2.5 models with correct syntax (Jan 2026)
 
 Installation:
-    pip install google-generativeai
-
-Free Tier Limits (as of 2024):
-    - 60 requests per minute
-    - 1,500 requests per day
-    - Completely FREE!
+    pip install google-genai
 
 Get your API key:
-    https://makersuite.google.com/app/apikey
+    https://aistudio.google.com/app/apikey
 """
 
-import google.generativeai as genai
+from google import genai
+from google.genai import types
 import json
 import streamlit as st
 from PIL import Image
@@ -42,13 +37,12 @@ def analyze_image_with_gemini(image, api_key=None):
             api_key = st.secrets["gemini"]["api_key"]
         except Exception:
             st.error("❌ Gemini API key not found. Please add it to .streamlit/secrets.toml")
-            st.info("Get your FREE API key at: https://makersuite.google.com/app/apikey")
+            st.info("Get your FREE API key at: https://aistudio.google.com/app/apikey")
             return get_fallback_analysis(image)
 
-    # Configure Gemini
+    # Configure Gemini client
     try:
-        genai.configure(api_key=api_key)
-        model = genai.GenerativeModel('gemini-1.5-flash')  # Fast and free!
+        client = genai.Client(api_key=api_key)
     except Exception as e:
         st.error(f"❌ Failed to initialize Gemini API: {e}")
         return get_fallback_analysis(image)
@@ -168,8 +162,22 @@ RETURN ONLY VALID JSON - NO MARKDOWN, NO CODE BLOCKS, NO PREAMBLE:
 If no defects visible, return empty defects array but still provide overall assessment noting that no visible issues were found (but hidden problems may exist)."""
 
     try:
-        # Generate content with image
-        response = model.generate_content([system_prompt, image])
+        # Convert PIL Image to bytes
+        img_byte_arr = io.BytesIO()
+        image.save(img_byte_arr, format='PNG')
+        img_byte_arr = img_byte_arr.getvalue()
+
+        # Use Gemini 2.5 Flash (latest and fastest)
+        response = client.models.generate_content(
+            model='gemini-2.5-flash',
+            contents=[
+                system_prompt,
+                types.Part.from_bytes(
+                    data=img_byte_arr,
+                    mime_type="image/png"
+                )
+            ]
+        )
 
         # Get response text
         response_text = response.text.strip()
@@ -231,12 +239,13 @@ If no defects visible, return empty defects array but still provide overall asse
         st.error(f"❌ Gemini API error: {e}")
 
         # Check for common errors
-        if "API_KEY_INVALID" in str(e):
+        error_str = str(e)
+        if "API_KEY_INVALID" in error_str or "invalid api key" in error_str.lower():
             st.error("🔑 Invalid API key. Please check your Gemini API key.")
-            st.info("Get a new key at: https://makersuite.google.com/app/apikey")
-        elif "QUOTA_EXCEEDED" in str(e):
+            st.info("Get a new key at: https://aistudio.google.com/app/apikey")
+        elif "QUOTA_EXCEEDED" in error_str or "quota" in error_str.lower():
             st.warning("⏰ Rate limit exceeded. Free tier: 60 requests/min, 1500/day. Please wait a moment.")
-        elif "SAFETY" in str(e):
+        elif "SAFETY" in error_str:
             st.warning("⚠️ Image blocked by safety filters. Try a different image.")
 
         return get_fallback_analysis(image)
@@ -285,14 +294,15 @@ def test_gemini_connection(api_key):
     Returns: (success: bool, message: str)
     """
     try:
-        genai.configure(api_key=api_key)
-        model = genai.GenerativeModel('gemini-1.5-flash')
+        client = genai.Client(api_key=api_key)
 
-        # Simple test
-        response = model.generate_content("Hello! Are you working?")
+        response = client.models.generate_content(
+            model='gemini-2.5-flash',
+            contents="Hello! Are you working? Reply with 'Yes, I am working!' if you can read this."
+        )
 
         if response.text:
-            return True, "✅ Gemini API connection successful!"
+            return True, f"✅ Gemini API connection successful! Response: {response.text}"
         else:
             return False, "❌ Received empty response from Gemini"
 
@@ -309,39 +319,14 @@ if __name__ == "__main__":
     print("Google Gemini Vision API Integration for Property Inspection")
     print("=" * 70)
     print()
-    print("🎉 WHY GEMINI?")
+    print("🎉 USING LATEST GEMINI 2.5 MODELS!")
     print("- ✅ Completely FREE (generous free tier)")
     print("- ✅ 60 requests per minute")
     print("- ✅ 1,500 requests per day")
     print("- ✅ Powerful vision capabilities")
-    print("- ✅ Fast response times")
+    print("- ✅ Faster than ever with Gemini 2.5 Flash")
     print()
-    print("📋 SETUP STEPS:")
+    print("📋 Using: gemini-2.5-flash")
     print()
-    print("1. Get Your FREE API Key:")
-    print("   → Visit: https://makersuite.google.com/app/apikey")
-    print("   → Sign in with your Google account")
-    print("   → Click 'Create API Key'")
-    print("   → Copy your key")
-    print()
-    print("2. Install Package:")
-    print("   pip install google-generativeai")
-    print()
-    print("3. Add to .streamlit/secrets.toml:")
-    print("   [gemini]")
-    print("   api_key = 'your-gemini-api-key-here'")
-    print()
-    print("4. Update app_improved.py:")
-    print("   # Add at the top:")
-    print("   from gemini_vision_integration import analyze_image_with_gemini")
-    print()
-    print("   # Replace analyze_image_with_ai function:")
-    print("   def analyze_image_with_ai(image):")
-    print("       return analyze_image_with_gemini(image)")
-    print()
-    print("5. Run your app:")
-    print("   streamlit run app_improved.py")
-    print()
-    print("=" * 70)
-    print("🚀 That's it! You now have FREE AI-powered property inspection!")
+    print("🚀 Ready to use!")
     print("=" * 70)

@@ -8,7 +8,7 @@ import base64
 from datetime import datetime
 import uuid
 import numpy as np
-from gemini_intagration import analyze_image_with_gemini  # ← ADDED THIS LINE
+from gemini_intagration import analyze_image_with_gemini
 
 # ============================================
 # PAGE CONFIGURATION
@@ -16,53 +16,467 @@ from gemini_intagration import analyze_image_with_gemini  # ← ADDED THIS LINE
 st.set_page_config(
     page_title="Property Inspection AI",
     page_icon="🏠",
-    layout="wide"
+    layout="wide",
+    initial_sidebar_state="expanded"
 )
 
 # ============================================
-# CUSTOM CSS
+# ENHANCED CUSTOM CSS WITH ANIMATIONS
 # ============================================
 st.markdown("""
 <style>
+    @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700;800&family=Space+Mono:wght@400;700&display=swap');
+
+    /* Global Styles */
+    * {
+        font-family: 'Outfit', sans-serif;
+    }
+
+    .stApp {
+        background: linear-gradient(135deg, #0f0c29 0%, #302b63 50%, #24243e 100%);
+        background-attachment: fixed;
+    }
+
+    /* Animated Header */
     .main-header {
-        font-size: 2.5rem;
-        font-weight: bold;
-        color: #1f77b4;
+        font-size: 3.5rem;
+        font-weight: 800;
         text-align: center;
-        padding: 1rem;
-        background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+        padding: 2rem 1rem;
+        background: linear-gradient(120deg, #00f5ff, #0080ff, #ff00ff, #ff0080);
+        background-size: 300% 300%;
         -webkit-background-clip: text;
         -webkit-text-fill-color: transparent;
+        animation: gradientShift 8s ease infinite;
+        letter-spacing: -0.02em;
+        text-transform: uppercase;
+        position: relative;
     }
-    .metric-card {
-        background-color: #f0f2f6;
-        padding: 1rem;
-        border-radius: 0.5rem;
-        border-left: 4px solid #1f77b4;
+
+    @keyframes gradientShift {
+        0% { background-position: 0% 50%; }
+        50% { background-position: 100% 50%; }
+        100% { background-position: 0% 50%; }
     }
-    .stAlert {
-        background-color: #e8f4f8;
-        border-left: 4px solid #1f77b4;
+
+    .subtitle {
+        text-align: center;
+        color: #a0a0ff;
+        font-size: 1.1rem;
+        font-weight: 300;
+        margin-top: -1rem;
+        margin-bottom: 2rem;
+        letter-spacing: 0.05em;
+        animation: fadeInUp 1s ease-out;
     }
-    .upload-section {
-        background-color: #f0f8ff;
+
+    @keyframes fadeInUp {
+        from {
+            opacity: 0;
+            transform: translateY(20px);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+
+    /* Glass Morphism Cards */
+    .glass-card {
+        background: rgba(255, 255, 255, 0.08);
+        backdrop-filter: blur(20px);
+        border-radius: 20px;
+        border: 1px solid rgba(255, 255, 255, 0.15);
         padding: 2rem;
-        border-radius: 10px;
-        border: 2px dashed #1f77b4;
+        margin: 1rem 0;
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+        transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+        animation: slideIn 0.6s ease-out;
+    }
+
+    .glass-card:hover {
+        transform: translateY(-8px);
+        box-shadow: 0 12px 48px rgba(0, 255, 255, 0.2);
+        border-color: rgba(0, 255, 255, 0.3);
+    }
+
+    @keyframes slideIn {
+        from {
+            opacity: 0;
+            transform: translateY(30px);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+
+    /* Metric Cards with Animation */
+    .metric-card {
+        background: linear-gradient(135deg, rgba(0, 245, 255, 0.1) 0%, rgba(255, 0, 255, 0.1) 100%);
+        border: 2px solid rgba(0, 245, 255, 0.3);
+        border-radius: 16px;
+        padding: 1.5rem;
+        text-align: center;
+        transition: all 0.3s ease;
+        animation: popIn 0.5s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+        position: relative;
+        overflow: hidden;
+    }
+
+    .metric-card::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: -100%;
+        width: 100%;
+        height: 100%;
+        background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+        transition: left 0.5s;
+    }
+
+    .metric-card:hover::before {
+        left: 100%;
+    }
+
+    .metric-card:hover {
+        transform: scale(1.05) rotate(1deg);
+        box-shadow: 0 8px 32px rgba(0, 245, 255, 0.4);
+        border-color: rgba(0, 245, 255, 0.6);
+    }
+
+    @keyframes popIn {
+        0% {
+            opacity: 0;
+            transform: scale(0.8);
+        }
+        50% {
+            transform: scale(1.1);
+        }
+        100% {
+            opacity: 1;
+            transform: scale(1);
+        }
+    }
+
+    .metric-value {
+        font-size: 2.5rem;
+        font-weight: 800;
+        color: #00f5ff;
+        text-shadow: 0 0 20px rgba(0, 245, 255, 0.5);
+        font-family: 'Space Mono', monospace;
+    }
+
+    .metric-label {
+        font-size: 0.9rem;
+        color: #b0b0ff;
+        text-transform: uppercase;
+        letter-spacing: 0.1em;
+        margin-top: 0.5rem;
+        font-weight: 600;
+    }
+
+    /* Upload Section */
+    .upload-section {
+        background: linear-gradient(135deg, rgba(0, 128, 255, 0.1), rgba(255, 0, 255, 0.1));
+        border: 3px dashed rgba(0, 245, 255, 0.4);
+        border-radius: 24px;
+        padding: 3rem;
+        text-align: center;
+        margin: 2rem 0;
+        transition: all 0.3s ease;
+        animation: pulse 2s ease-in-out infinite;
+    }
+
+    @keyframes pulse {
+        0%, 100% {
+            box-shadow: 0 0 0 0 rgba(0, 245, 255, 0.4);
+        }
+        50% {
+            box-shadow: 0 0 0 20px rgba(0, 245, 255, 0);
+        }
+    }
+
+    .upload-section:hover {
+        border-color: rgba(0, 245, 255, 0.8);
+        background: linear-gradient(135deg, rgba(0, 128, 255, 0.15), rgba(255, 0, 255, 0.15));
+        animation: none;
+    }
+
+    /* Defect Cards with Severity Colors */
+    .defect-card {
+        background: rgba(255, 255, 255, 0.05);
+        backdrop-filter: blur(10px);
+        padding: 1.5rem;
+        border-radius: 16px;
+        margin: 1rem 0;
+        border-left: 5px solid;
+        box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+        transition: all 0.3s ease;
+        animation: slideInLeft 0.5s ease-out;
+    }
+
+    @keyframes slideInLeft {
+        from {
+            opacity: 0;
+            transform: translateX(-30px);
+        }
+        to {
+            opacity: 1;
+            transform: translateX(0);
+        }
+    }
+
+    .defect-card:hover {
+        transform: translateX(10px);
+        box-shadow: 0 6px 24px rgba(0, 0, 0, 0.5);
+    }
+
+    .critical-card { 
+        border-left-color: #ff0066;
+        background: linear-gradient(90deg, rgba(255, 0, 102, 0.1), transparent);
+    }
+
+    .high-card { 
+        border-left-color: #ff6600;
+        background: linear-gradient(90deg, rgba(255, 102, 0, 0.1), transparent);
+    }
+
+    .medium-card { 
+        border-left-color: #ffcc00;
+        background: linear-gradient(90deg, rgba(255, 204, 0, 0.1), transparent);
+    }
+
+    .low-card { 
+        border-left-color: #00ff99;
+        background: linear-gradient(90deg, rgba(0, 255, 153, 0.1), transparent);
+    }
+
+    .defect-card h4 {
+        color: #00f5ff;
+        font-weight: 700;
+        font-size: 1.3rem;
+        margin-bottom: 0.8rem;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+    }
+
+    .defect-card p {
+        color: #d0d0ff;
+        line-height: 1.6;
+        margin: 0.5rem 0;
+    }
+
+    .defect-card strong {
+        color: #00f5ff;
+        font-weight: 600;
+    }
+
+    /* Buttons */
+    .stButton > button {
+        background: linear-gradient(135deg, #00f5ff, #0080ff);
+        color: white;
+        border: none;
+        border-radius: 12px;
+        padding: 0.8rem 2rem;
+        font-weight: 700;
+        font-size: 1.1rem;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        transition: all 0.3s ease;
+        box-shadow: 0 4px 16px rgba(0, 128, 255, 0.4);
+        position: relative;
+        overflow: hidden;
+    }
+
+    .stButton > button::before {
+        content: '';
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        width: 0;
+        height: 0;
+        border-radius: 50%;
+        background: rgba(255, 255, 255, 0.3);
+        transform: translate(-50%, -50%);
+        transition: width 0.6s, height 0.6s;
+    }
+
+    .stButton > button:hover::before {
+        width: 300px;
+        height: 300px;
+    }
+
+    .stButton > button:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 8px 24px rgba(0, 245, 255, 0.6);
+    }
+
+    /* Sidebar Styling */
+    [data-testid="stSidebar"] {
+        background: linear-gradient(180deg, rgba(15, 12, 41, 0.95), rgba(36, 36, 62, 0.95));
+        backdrop-filter: blur(20px);
+        border-right: 1px solid rgba(0, 245, 255, 0.2);
+    }
+
+    [data-testid="stSidebar"] h1, 
+    [data-testid="stSidebar"] h2,
+    [data-testid="stSidebar"] h3 {
+        color: #00f5ff;
+        font-weight: 700;
+    }
+
+    /* Progress Bar */
+    .stProgress > div > div {
+        background: linear-gradient(90deg, #00f5ff, #ff00ff);
+        animation: progressGlow 1.5s ease-in-out infinite;
+    }
+
+    @keyframes progressGlow {
+        0%, 100% {
+            box-shadow: 0 0 10px rgba(0, 245, 255, 0.5);
+        }
+        50% {
+            box-shadow: 0 0 20px rgba(255, 0, 255, 0.8);
+        }
+    }
+
+    /* Tabs */
+    .stTabs [data-baseweb="tab-list"] {
+        gap: 8px;
+        background: rgba(0, 0, 0, 0.2);
+        padding: 0.5rem;
+        border-radius: 12px;
+    }
+
+    .stTabs [data-baseweb="tab"] {
+        background: rgba(255, 255, 255, 0.05);
+        border-radius: 8px;
+        color: #a0a0ff;
+        font-weight: 600;
+        transition: all 0.3s ease;
+    }
+
+    .stTabs [aria-selected="true"] {
+        background: linear-gradient(135deg, #00f5ff, #0080ff);
+        color: white;
+        box-shadow: 0 4px 16px rgba(0, 245, 255, 0.4);
+    }
+
+    /* Dataframe Styling */
+    .dataframe {
+        border-radius: 12px;
+        overflow: hidden;
+        box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+    }
+
+    /* Success/Error/Warning Messages */
+    .stAlert {
+        border-radius: 12px;
+        border-left: 4px solid;
+        backdrop-filter: blur(10px);
+        animation: slideInRight 0.5s ease-out;
+    }
+
+    @keyframes slideInRight {
+        from {
+            opacity: 0;
+            transform: translateX(30px);
+        }
+        to {
+            opacity: 1;
+            transform: translateX(0);
+        }
+    }
+
+    /* Loading Spinner Enhancement */
+    .stSpinner > div {
+        border-color: #00f5ff !important;
+        border-right-color: transparent !important;
+    }
+
+    /* Section Headers */
+    h1, h2, h3 {
+        color: #00f5ff;
+        font-weight: 700;
+        text-shadow: 0 0 20px rgba(0, 245, 255, 0.3);
+    }
+
+    /* Text Colors */
+    p, label, span {
+        color: #d0d0ff;
+    }
+
+    /* Input Fields */
+    .stTextInput > div > div > input,
+    .stNumberInput > div > div > input,
+    .stSelectbox > div > div {
+        background: rgba(255, 255, 255, 0.05);
+        border: 2px solid rgba(0, 245, 255, 0.3);
+        border-radius: 8px;
+        color: white;
+        transition: all 0.3s ease;
+    }
+
+    .stTextInput > div > div > input:focus,
+    .stNumberInput > div > div > input:focus,
+    .stSelectbox > div > div:focus-within {
+        border-color: rgba(0, 245, 255, 0.8);
+        box-shadow: 0 0 20px rgba(0, 245, 255, 0.3);
+    }
+
+    /* Divider */
+    hr {
+        border: none;
+        height: 2px;
+        background: linear-gradient(90deg, transparent, rgba(0, 245, 255, 0.5), transparent);
         margin: 2rem 0;
     }
-    .defect-card {
-        background-color: white;
-        padding: 1rem;
-        border-radius: 8px;
-        border-left: 4px solid;
-        margin: 0.5rem 0;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+
+    /* Image Preview */
+    .stImage {
+        border-radius: 12px;
+        overflow: hidden;
+        box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+        transition: transform 0.3s ease;
     }
-    .critical-card { border-left-color: #dc3545; }
-    .high-card { border-left-color: #fd7e14; }
-    .medium-card { border-left-color: #ffc107; }
-    .low-card { border-left-color: #28a745; }
+
+    .stImage:hover {
+        transform: scale(1.05);
+    }
+
+    /* Footer */
+    .footer {
+        text-align: center;
+        padding: 2rem;
+        color: #8080ff;
+        font-size: 0.9rem;
+        animation: fadeIn 2s ease-out;
+    }
+
+    @keyframes fadeIn {
+        from { opacity: 0; }
+        to { opacity: 1; }
+    }
+
+    /* Scrollbar */
+    ::-webkit-scrollbar {
+        width: 10px;
+        height: 10px;
+    }
+
+    ::-webkit-scrollbar-track {
+        background: rgba(0, 0, 0, 0.2);
+    }
+
+    ::-webkit-scrollbar-thumb {
+        background: linear-gradient(180deg, #00f5ff, #0080ff);
+        border-radius: 5px;
+    }
+
+    ::-webkit-scrollbar-thumb:hover {
+        background: linear-gradient(180deg, #0080ff, #ff00ff);
+    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -102,13 +516,8 @@ def image_to_base64(image):
     return base64.b64encode(buffered.getvalue()).decode()
 
 
-# ============================================
-# REPLACED FUNCTION - NOW USES REAL GEMINI AI
-# ============================================
 def analyze_image_with_ai(image):
-    """
-    AI-Powered Property Inspection using FREE Google Gemini API
-    """
+    """AI-Powered Property Inspection using FREE Google Gemini API"""
     return analyze_image_with_gemini(image)
 
 
@@ -116,14 +525,14 @@ def analyze_image_with_ai(image):
 # HEADER
 # ============================================
 st.markdown('<h1 class="main-header">🏠 Property Inspection AI</h1>', unsafe_allow_html=True)
-st.markdown("### AI-Powered Defect Detection & Comprehensive Risk Analysis")
+st.markdown('<p class="subtitle">AI-Powered Defect Detection & Comprehensive Risk Analysis</p>', unsafe_allow_html=True)
 st.markdown("---")
 
 # ============================================
 # SIDEBAR WITH MODE SELECTION
 # ============================================
 with st.sidebar:
-    st.header("🔍 Navigation")
+    st.markdown("### 🔍 Navigation")
 
     app_mode = st.radio(
         "Choose Mode:",
@@ -135,7 +544,7 @@ with st.sidebar:
 
     # Only show property selector in View mode
     if app_mode == "📊 View Existing Reports":
-        st.header("🔍 Property Selection")
+        st.markdown("### 🏢 Property Selection")
 
         properties_df = pd.read_sql("""
             SELECT property_id, address, city 
@@ -173,10 +582,13 @@ with st.sidebar:
 # ============================================
 
 if app_mode == "📸 New Inspection (Upload Images)":
+    st.markdown('<div class="glass-card">', unsafe_allow_html=True)
     st.header("📸 New Property Inspection with AI")
     st.info("👉 Upload property images and let AI detect defects automatically with detailed severity analysis!")
+    st.markdown('</div>', unsafe_allow_html=True)
 
     # Property Information Form
+    st.markdown('<div class="glass-card">', unsafe_allow_html=True)
     st.subheader("🏠 Property Information")
     col1, col2 = st.columns(2)
 
@@ -189,10 +601,10 @@ if app_mode == "📸 New Inspection (Upload Images)":
         bedrooms = st.number_input("🛏️ Bedrooms", min_value=1, max_value=10, value=3)
         area_sqft = st.number_input("📏 Area (sqft)", min_value=100, max_value=10000, value=1200)
         year_built = st.number_input("📅 Year Built", min_value=1900, max_value=2026, value=2020)
-
-    st.markdown("---")
+    st.markdown('</div>', unsafe_allow_html=True)
 
     # Room Information
+    st.markdown('<div class="glass-card">', unsafe_allow_html=True)
     st.subheader("🚪 Room Information")
     col1, col2 = st.columns(2)
 
@@ -200,12 +612,11 @@ if app_mode == "📸 New Inspection (Upload Images)":
         room_name = st.text_input("Room Name", placeholder="Kitchen, Master Bedroom, etc.")
     with col2:
         room_type = st.selectbox("Room Type", ["bedroom", "kitchen", "bathroom", "living", "balcony", "other"])
-
-    st.markdown("---")
+    st.markdown('</div>', unsafe_allow_html=True)
 
     # Image Upload
-    st.subheader("📤 Upload Inspection Images")
     st.markdown('<div class="upload-section">', unsafe_allow_html=True)
+    st.subheader("📤 Upload Inspection Images")
 
     uploaded_files = st.file_uploader(
         "Drop images here or click to browse (supports: JPG, PNG)",
@@ -247,17 +658,16 @@ if app_mode == "📸 New Inspection (Upload Images)":
                 cursor = conn.cursor()
 
                 # Insert property
-                cursor.execute(f"""
+                cursor.execute("""
                     INSERT INTO properties (property_id, address, city, property_type, bedrooms, area_sqft, year_built)
-                    VALUES ('{property_id}', '{property_address}', '{property_city}', '{property_type}', 
-                            {bedrooms}, {area_sqft}, {year_built})
-                """)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s)
+                """, (property_id, property_address, property_city, property_type, bedrooms, area_sqft, year_built))
 
                 # Insert room
-                cursor.execute(f"""
+                cursor.execute("""
                     INSERT INTO rooms (room_id, property_id, room_name, room_type, floor_number)
-                    VALUES ('{room_id}', '{property_id}', '{room_name}', '{room_type}', 0)
-                """)
+                    VALUES (%s, %s, %s, %s, %s)
+                """, (room_id, property_id, room_name, room_type, 0))
 
                 st.success(f"✅ Property created: {property_id}")
 
@@ -272,7 +682,7 @@ if app_mode == "📸 New Inspection (Upload Images)":
                     # Read image
                     image = Image.open(uploaded_file)
 
-                    # AI Analysis - NOW USES REAL GEMINI AI!
+                    # AI Analysis
                     analysis_result = analyze_image_with_ai(image)
 
                     # Check if property image
@@ -285,12 +695,11 @@ if app_mode == "📸 New Inspection (Upload Images)":
                     upload_id = f"UPL{str(uuid.uuid4())[:6].upper()}"
 
                     # Store image metadata
-                    cursor.execute(f"""
+                    cursor.execute("""
                         INSERT INTO uploaded_images 
                         (upload_id, property_id, room_name, upload_timestamp, image_data, image_format, file_size_kb, uploaded_by)
-                        VALUES ('{upload_id}', '{property_id}', '{room_name}', CURRENT_TIMESTAMP(), 
-                                'base64_data_placeholder', 'png', 100, 'web_user')
-                    """)
+                        VALUES (%s, %s, %s, CURRENT_TIMESTAMP(), %s, %s, %s, %s)
+                    """, (upload_id, property_id, room_name, 'base64_data_placeholder', 'png', 100, 'web_user'))
 
                     # Store each detection
                     for detection in analysis_result["detections"]:
@@ -298,23 +707,23 @@ if app_mode == "📸 New Inspection (Upload Images)":
                         finding_id = f"F{str(uuid.uuid4())[:6].upper()}"
 
                         # Store AI detection
-                        cursor.execute(f"""
+                        # Escape single quotes in description
+                        escaped_description = detection["description"].replace("'", "''")
+                        escaped_object = detection["detected_object"].replace("'", "''")
+
+                        cursor.execute("""
                             INSERT INTO ai_detections 
                             (detection_id, upload_id, detected_object, confidence_score, bounding_box, severity, description, detection_timestamp)
-                            VALUES ('{detection_id}', '{upload_id}', '{detection["detected_object"]}', 
-                                    {detection["confidence_score"]}, '', 
-                                    '{detection["severity"]}', '{detection["description"]}', CURRENT_TIMESTAMP())
-                        """)
+                            VALUES (%s, %s, %s, %s, %s, %s, %s, CURRENT_TIMESTAMP())
+                        """, (detection_id, upload_id, escaped_object, detection["confidence_score"], '',
+                              detection["severity"], escaped_description))
 
                         # Store as finding
-                        cursor.execute(f"""
+                        cursor.execute("""
                             INSERT INTO findings 
                             (finding_id, room_id, inspection_date, finding_text, inspector_notes, detection_id, upload_id, ai_generated)
-                            VALUES ('{finding_id}', '{room_id}', CURRENT_DATE(), 
-                                    '{detection["detected_object"]}', 
-                                    '{detection["description"]}', 
-                                    '{detection_id}', '{upload_id}', TRUE)
-                        """)
+                            VALUES (%s, %s, CURRENT_DATE(), %s, %s, %s, %s, %s)
+                        """, (finding_id, room_id, escaped_object, escaped_description, detection_id, upload_id, True))
 
                         all_findings.append({
                             **detection,
@@ -333,15 +742,42 @@ if app_mode == "📸 New Inspection (Upload Images)":
                     st.success(f"🎉 Analysis Complete!")
                     st.balloons()
 
+                    # Metrics Display
+                    st.markdown('<div class="glass-card">', unsafe_allow_html=True)
                     col1, col2, col3, col4 = st.columns(4)
+
                     with col1:
-                        st.metric("📸 Images Analyzed", len(uploaded_files) - non_property_count)
+                        st.markdown(f"""
+                        <div class="metric-card">
+                            <div class="metric-value">{len(uploaded_files) - non_property_count}</div>
+                            <div class="metric-label">📸 Images Analyzed</div>
+                        </div>
+                        """, unsafe_allow_html=True)
+
                     with col2:
-                        st.metric("🔍 Defects Found", len(all_findings))
+                        st.markdown(f"""
+                        <div class="metric-card">
+                            <div class="metric-value">{len(all_findings)}</div>
+                            <div class="metric-label">🔍 Defects Found</div>
+                        </div>
+                        """, unsafe_allow_html=True)
+
                     with col3:
-                        st.metric("🎯 Condition Score", f"{all_findings[0]['overall_score']}/100")
+                        st.markdown(f"""
+                        <div class="metric-card">
+                            <div class="metric-value">{all_findings[0]['overall_score']}/100</div>
+                            <div class="metric-label">🎯 Condition Score</div>
+                        </div>
+                        """, unsafe_allow_html=True)
+
                     with col4:
-                        st.metric("📊 Usability", all_findings[0]['usability'].split('-')[0].strip())
+                        st.markdown(f"""
+                        <div class="metric-card">
+                            <div class="metric-value">{all_findings[0]['usability'].split('-')[0].strip()}</div>
+                            <div class="metric-label">📊 Usability</div>
+                        </div>
+                        """, unsafe_allow_html=True)
+                    st.markdown('</div>', unsafe_allow_html=True)
 
                     # Show detailed findings
                     st.markdown("---")
@@ -436,6 +872,7 @@ elif app_mode == "📊 View Existing Reports":
 
         # TAB 1: DASHBOARD OVERVIEW
         with tab1:
+            st.markdown('<div class="glass-card">', unsafe_allow_html=True)
             st.header("📊 Property Overview Dashboard")
 
             prop_risk = pd.read_sql(f"""
@@ -450,34 +887,42 @@ elif app_mode == "📊 View Existing Reports":
                 col1, col2, col3, col4 = st.columns(4)
 
                 with col1:
-                    st.metric(
-                        label="🎯 Risk Score",
-                        value=f"{risk_data['property_risk_score']}/100",
-                        delta=f"Grade: {risk_data['property_grade']}",
-                        delta_color="inverse"
-                    )
+                    st.markdown(f"""
+                    <div class="metric-card">
+                        <div class="metric-value">{risk_data['property_risk_score']}/100</div>
+                        <div class="metric-label">🎯 Risk Score (Grade: {risk_data['property_grade']})</div>
+                    </div>
+                    """, unsafe_allow_html=True)
 
                 with col2:
-                    st.metric(
-                        label="⚠️ Risk Level",
-                        value=risk_data['property_risk_category']
-                    )
+                    st.markdown(f"""
+                    <div class="metric-card">
+                        <div class="metric-value">{risk_data['property_risk_category']}</div>
+                        <div class="metric-label">⚠️ Risk Level</div>
+                    </div>
+                    """, unsafe_allow_html=True)
 
                 with col3:
-                    st.metric(
-                        label="🔍 Total Defects",
-                        value=int(risk_data['total_defects']),
-                        delta=f"{int(risk_data['total_critical'])} Critical"
-                    )
+                    st.markdown(f"""
+                    <div class="metric-card">
+                        <div class="metric-value">{int(risk_data['total_defects'])}</div>
+                        <div class="metric-label">🔍 Total Defects ({int(risk_data['total_critical'])} Critical)</div>
+                    </div>
+                    """, unsafe_allow_html=True)
 
                 with col4:
-                    st.metric(
-                        label="🚪 High Risk Rooms",
-                        value=f"{int(risk_data['high_risk_rooms'])}/{int(risk_data['total_rooms'])}"
-                    )
+                    st.markdown(f"""
+                    <div class="metric-card">
+                        <div class="metric-value">{int(risk_data['high_risk_rooms'])}/{int(risk_data['total_rooms'])}</div>
+                        <div class="metric-label">🚪 High Risk Rooms</div>
+                    </div>
+                    """, unsafe_allow_html=True)
+
+                st.markdown('</div>', unsafe_allow_html=True)
 
                 st.markdown("---")
 
+                st.markdown('<div class="glass-card">', unsafe_allow_html=True)
                 st.subheader("🚪 Room-by-Room Breakdown")
 
                 rooms_df = pd.read_sql(f"""
@@ -499,17 +944,19 @@ elif app_mode == "📊 View Existing Reports":
 
                 def highlight_risk(row):
                     if row['risk_category'] == 'High Risk':
-                        return ['background-color: #ffcccc'] * len(row)
+                        return ['background-color: rgba(255, 0, 102, 0.2)'] * len(row)
                     elif row['risk_category'] == 'Medium Risk':
-                        return ['background-color: #fff4cc'] * len(row)
+                        return ['background-color: rgba(255, 204, 0, 0.2)'] * len(row)
                     else:
-                        return ['background-color: #ccffcc'] * len(row)
+                        return ['background-color: rgba(0, 255, 153, 0.2)'] * len(row)
 
 
                 styled_rooms = rooms_df.style.apply(highlight_risk, axis=1)
                 st.dataframe(styled_rooms, use_container_width=True, hide_index=True)
+                st.markdown('</div>', unsafe_allow_html=True)
 
                 st.markdown("---")
+                st.markdown('<div class="glass-card">', unsafe_allow_html=True)
                 st.subheader("📊 Risk Score Visualization")
 
                 fig = px.bar(
@@ -518,26 +965,30 @@ elif app_mode == "📊 View Existing Reports":
                     y='room_risk_score',
                     color='risk_category',
                     color_discrete_map={
-                        'High Risk': '#ff4444',
-                        'Medium Risk': '#ffaa00',
-                        'Low Risk': '#44ff44'
+                        'High Risk': '#ff0066',
+                        'Medium Risk': '#ffcc00',
+                        'Low Risk': '#00ff99'
                     },
                     title="Risk Score by Room",
                     labels={'room_name': 'Room', 'room_risk_score': 'Risk Score (0-100)'}
                 )
+                fig.update_layout(
+                    plot_bgcolor='rgba(0,0,0,0)',
+                    paper_bgcolor='rgba(0,0,0,0)',
+                    font_color='#d0d0ff'
+                )
                 st.plotly_chart(fig, use_container_width=True)
+                st.markdown('</div>', unsafe_allow_html=True)
             else:
                 st.info("No risk analysis data available for this property yet.")
-
-        # TAB 2, 3, 4 - Add your remaining tabs here if needed
 
 # ============================================
 # FOOTER
 # ============================================
 st.markdown("---")
 st.markdown("""
-<div style='text-align: center; color: #666; padding: 1rem;'>
-    <p>🏠 Property Inspection AI | Powered by Snowflake & Google Gemini AI (FREE)</p>
+<div class="footer">
+    <p>🏠 Property Inspection AI | Powered by Snowflake & Google Gemini AI</p>
     <p>Real AI-powered defect detection with severity analysis and usability ratings</p>
 </div>
 """, unsafe_allow_html=True)
