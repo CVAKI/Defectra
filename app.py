@@ -712,6 +712,17 @@ if app_mode == "📸 New Inspection (Upload Images)":
                     # Read image
                     image = Image.open(uploaded_file)
 
+                    # Convert image to base64 for storage
+                    image_base64 = image_to_base64(image)
+
+                    # Get file size
+                    uploaded_file.seek(0)
+                    file_size_kb = len(uploaded_file.read()) / 1024
+                    uploaded_file.seek(0)  # Reset file pointer
+
+                    # Get image format
+                    image_format = image.format.lower() if image.format else 'png'
+
                     # AI Analysis
                     analysis_result = analyze_image_with_ai(image)
 
@@ -724,12 +735,12 @@ if app_mode == "📸 New Inspection (Upload Images)":
                     # Generate upload ID
                     upload_id = f"UPL{str(uuid.uuid4())[:6].upper()}"
 
-                    # Store image metadata
+                    # Store image with actual base64 data
                     cursor.execute("""
                         INSERT INTO uploaded_images 
                         (upload_id, property_id, room_name, upload_timestamp, image_data, image_format, file_size_kb, uploaded_by)
                         VALUES (%s, %s, %s, CURRENT_TIMESTAMP(), %s, %s, %s, %s)
-                    """, (upload_id, property_id, room_name, 'base64_data_placeholder', 'png', 100, 'web_user'))
+                    """, (upload_id, property_id, room_name, image_base64, image_format, int(file_size_kb), 'web_user'))
 
                     # Store each detection
                     for detection in analysis_result["detections"]:
@@ -1011,6 +1022,340 @@ elif app_mode == "📊 View Existing Reports":
                 st.markdown('</div>', unsafe_allow_html=True)
             else:
                 st.info("No risk analysis data available for this property yet.")
+
+        # TAB 2: AI DETECTION DETAILS
+        with tab2:
+            st.markdown('<div class="glass-card">', unsafe_allow_html=True)
+            st.header("🤖 AI Detection Results")
+
+            # Get all AI detections for this property
+            detections_df = pd.read_sql(f"""
+                SELECT 
+                    ad.detected_object,
+                    ad.confidence_score,
+                    ad.severity,
+                    ad.description,
+                    ad.detection_timestamp,
+                    ui.room_name,
+                    ui.upload_timestamp
+                FROM ai_detections ad
+                JOIN uploaded_images ui ON ad.upload_id = ui.upload_id
+                WHERE ui.property_id = '{selected_property}'
+                ORDER BY ad.detection_timestamp DESC
+            """, conn)
+            detections_df.columns = detections_df.columns.str.lower()
+
+            if not detections_df.empty:
+                # Summary metrics
+                col1, col2, col3 = st.columns(3)
+
+                with col1:
+                    total_detections = len(detections_df)
+                    st.markdown(f"""
+                    <div class="metric-card">
+                        <div class="metric-value">{total_detections}</div>
+                        <div class="metric-label">🔍 Total Detections</div>
+                    </div>
+                    """, unsafe_allow_html=True)
+
+                with col2:
+                    avg_confidence = detections_df['confidence_score'].mean()
+                    st.markdown(f"""
+                    <div class="metric-card">
+                        <div class="metric-value">{avg_confidence:.1f}%</div>
+                        <div class="metric-label">🎯 Avg Confidence</div>
+                    </div>
+                    """, unsafe_allow_html=True)
+
+                with col3:
+                    unique_rooms = detections_df['room_name'].nunique()
+                    st.markdown(f"""
+                    <div class="metric-card">
+                        <div class="metric-value">{unique_rooms}</div>
+                        <div class="metric-label">🚪 Rooms Inspected</div>
+                    </div>
+                    """, unsafe_allow_html=True)
+
+                st.markdown("---")
+
+                # Group detections by severity
+                st.subheader("📋 Detection Details by Severity")
+
+                critical = detections_df[detections_df['severity'] == 'critical']
+                high = detections_df[detections_df['severity'] == 'high']
+                medium = detections_df[detections_df['severity'] == 'medium']
+                low = detections_df[detections_df['severity'] == 'low']
+
+                if len(critical) > 0:
+                    st.markdown("### 🔴 Critical Issues")
+                    for _, detection in critical.iterrows():
+                        st.markdown(f"""
+                        <div class="defect-card critical-card">
+                            <h4>{detection['detected_object'].upper()}</h4>
+                            <p><strong>Room:</strong> {detection['room_name']}</p>
+                            <p><strong>Confidence:</strong> {detection['confidence_score']:.1f}%</p>
+                            <p><strong>Description:</strong> {detection['description']}</p>
+                            <p><strong>Detected:</strong> {detection['detection_timestamp']}</p>
+                        </div>
+                        """, unsafe_allow_html=True)
+
+                if len(high) > 0:
+                    st.markdown("### 🟠 High Priority Issues")
+                    for _, detection in high.iterrows():
+                        st.markdown(f"""
+                        <div class="defect-card high-card">
+                            <h4>{detection['detected_object'].title()}</h4>
+                            <p><strong>Room:</strong> {detection['room_name']}</p>
+                            <p><strong>Confidence:</strong> {detection['confidence_score']:.1f}%</p>
+                            <p><strong>Description:</strong> {detection['description']}</p>
+                        </div>
+                        """, unsafe_allow_html=True)
+
+                if len(medium) > 0:
+                    with st.expander("🟡 Medium Priority Issues"):
+                        for _, detection in medium.iterrows():
+                            st.markdown(f"""
+                            <div class="defect-card medium-card">
+                                <h4>{detection['detected_object'].title()}</h4>
+                                <p><strong>Room:</strong> {detection['room_name']}</p>
+                                <p><strong>Confidence:</strong> {detection['confidence_score']:.1f}%</p>
+                                <p><strong>Description:</strong> {detection['description']}</p>
+                            </div>
+                            """, unsafe_allow_html=True)
+
+                if len(low) > 0:
+                    with st.expander("🟢 Low Priority Issues"):
+                        for _, detection in low.iterrows():
+                            st.markdown(f"""
+                            <div class="defect-card low-card">
+                                <h4>{detection['detected_object'].title()}</h4>
+                                <p><strong>Room:</strong> {detection['room_name']}</p>
+                                <p><strong>Description:</strong> {detection['description']}</p>
+                            </div>
+                            """, unsafe_allow_html=True)
+            else:
+                st.info("No AI detections found for this property yet.")
+
+            st.markdown('</div>', unsafe_allow_html=True)
+
+        # TAB 3: RISK ANALYSIS
+        with tab3:
+            st.markdown('<div class="glass-card">', unsafe_allow_html=True)
+            st.header("📈 Comprehensive Risk Analysis")
+
+            # Get property data
+            prop_risk = pd.read_sql(f"""
+                SELECT * FROM property_risk_scores 
+                WHERE property_id = '{selected_property}'
+            """, conn)
+            prop_risk.columns = prop_risk.columns.str.lower()
+
+            if not prop_risk.empty:
+                risk_data = prop_risk.iloc[0]
+
+                # Risk breakdown
+                st.subheader("🎯 Risk Score Breakdown")
+
+                col1, col2 = st.columns(2)
+
+                with col1:
+                    # Severity distribution pie chart
+                    severity_data = pd.DataFrame({
+                        'Severity': ['Critical', 'High', 'Medium', 'Low'],
+                        'Count': [
+                            int(risk_data['total_critical']),
+                            int(risk_data['total_high']),
+                            int(risk_data['total_medium']),
+                            int(risk_data['total_low'])
+                        ]
+                    })
+
+                    fig_pie = px.pie(
+                        severity_data,
+                        values='Count',
+                        names='Severity',
+                        title='Defects by Severity',
+                        color='Severity',
+                        color_discrete_map={
+                            'Critical': '#ff0066',
+                            'High': '#ff6600',
+                            'Medium': '#ffcc00',
+                            'Low': '#00ff99'
+                        }
+                    )
+                    fig_pie.update_layout(
+                        plot_bgcolor='rgba(0,0,0,0)',
+                        paper_bgcolor='rgba(0,0,0,0)',
+                        font_color='#d0d0ff'
+                    )
+                    st.plotly_chart(fig_pie, use_container_width=True)
+
+                with col2:
+                    # Risk gauge
+                    st.markdown(f"""
+                    <div style='text-align: center; padding: 2rem;'>
+                        <div style='font-size: 4rem; font-weight: 800; color: #00f5ff;'>
+                            {int(risk_data['property_risk_score'])}
+                        </div>
+                        <div style='font-size: 1.5rem; color: #a0a0ff; margin-top: 1rem;'>
+                            Risk Score
+                        </div>
+                        <div style='font-size: 2rem; font-weight: 700; color: #ff0066; margin-top: 1rem;'>
+                            Grade: {risk_data['property_grade']}
+                        </div>
+                        <div style='font-size: 1.2rem; color: #b0b0ff; margin-top: 1rem;'>
+                            {risk_data['property_risk_category']}
+                        </div>
+                    </div>
+                    """, unsafe_allow_html=True)
+
+                st.markdown("---")
+
+                # Recommendations
+                st.subheader("💡 Recommendations")
+
+                if risk_data['property_risk_category'] == 'High Risk':
+                    st.error("""
+                    **⚠️ HIGH RISK PROPERTY - Immediate Action Required**
+
+                    - Schedule professional inspection immediately
+                    - Address all critical issues before occupancy
+                    - Budget for significant repairs
+                    - Consider structural engineer consultation
+                    """)
+                elif risk_data['property_risk_category'] == 'Medium Risk':
+                    st.warning("""
+                    **⚡ MEDIUM RISK PROPERTY - Attention Needed**
+
+                    - Plan repairs within 1-3 months
+                    - Get quotes from qualified contractors
+                    - Monitor high-priority issues closely
+                    - Schedule follow-up inspection after repairs
+                    """)
+                else:
+                    st.success("""
+                    **✅ LOW RISK PROPERTY - Good Condition**
+
+                    - Maintain regular inspection schedule
+                    - Address minor issues as routine maintenance
+                    - Keep documentation of all repairs
+                    - Consider preventive maintenance plan
+                    """)
+            else:
+                st.info("No risk analysis data available yet.")
+
+            st.markdown('</div>', unsafe_allow_html=True)
+
+        # TAB 4: SUMMARY REPORT
+        with tab4:
+            st.markdown('<div class="glass-card">', unsafe_allow_html=True)
+            st.header("📝 Executive Summary Report")
+
+            # Get property info
+            prop_info = pd.read_sql(f"""
+                SELECT * FROM properties 
+                WHERE property_id = '{selected_property}'
+            """, conn)
+            prop_info.columns = prop_info.columns.str.lower()
+
+            # Get risk info
+            risk_info = pd.read_sql(f"""
+                SELECT * FROM property_risk_scores 
+                WHERE property_id = '{selected_property}'
+            """, conn)
+            risk_info.columns = risk_info.columns.str.lower()
+
+            if not prop_info.empty and not risk_info.empty:
+                prop = prop_info.iloc[0]
+                risk = risk_info.iloc[0]
+
+                # Property details
+                st.subheader("🏠 Property Information")
+                col1, col2 = st.columns(2)
+
+                with col1:
+                    st.markdown(f"""
+                    - **Address:** {prop['address']}
+                    - **City:** {prop['city']}
+                    - **Type:** {prop['property_type'].title()}
+                    """)
+
+                with col2:
+                    st.markdown(f"""
+                    - **Bedrooms:** {int(prop['bedrooms'])}
+                    - **Area:** {int(prop['area_sqft'])} sq ft
+                    - **Year Built:** {int(prop['year_built'])}
+                    """)
+
+                st.markdown("---")
+
+                # Inspection summary
+                st.subheader("🔍 Inspection Summary")
+
+                st.markdown(f"""
+                **Overall Assessment:** {risk['property_risk_category']} (Grade: {risk['property_grade']})
+
+                **Risk Score:** {int(risk['property_risk_score'])}/100
+
+                **Defects Found:**
+                - 🔴 Critical: {int(risk['total_critical'])}
+                - 🟠 High: {int(risk['total_high'])}
+                - 🟡 Medium: {int(risk['total_medium'])}
+                - 🟢 Low: {int(risk['total_low'])}
+                - **Total:** {int(risk['total_defects'])}
+
+                **Rooms Inspected:** {int(risk['total_rooms'])}
+                **High Risk Rooms:** {int(risk['high_risk_rooms'])}
+                """)
+
+                st.markdown("---")
+
+                # Download report button
+                report_data = f"""
+PROPERTY INSPECTION REPORT
+Generated by Defactra AI
+{'=' * 50}
+
+PROPERTY DETAILS
+Address: {prop['address']}
+City: {prop['city']}
+Type: {prop['property_type'].title()}
+Bedrooms: {int(prop['bedrooms'])}
+Area: {int(prop['area_sqft'])} sq ft
+Year Built: {int(prop['year_built'])}
+
+RISK ASSESSMENT
+Overall Risk: {risk['property_risk_category']}
+Risk Score: {int(risk['property_risk_score'])}/100
+Property Grade: {risk['property_grade']}
+
+DEFECTS SUMMARY
+Critical Issues: {int(risk['total_critical'])}
+High Priority: {int(risk['total_high'])}
+Medium Priority: {int(risk['total_medium'])}
+Low Priority: {int(risk['total_low'])}
+Total Defects: {int(risk['total_defects'])}
+
+ROOMS ANALYZED
+Total Rooms: {int(risk['total_rooms'])}
+High Risk Rooms: {int(risk['high_risk_rooms'])}
+
+{'=' * 50}
+Report generated on: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
+Powered by Defactra AI
+"""
+
+                st.download_button(
+                    label="📥 Download Full Report",
+                    data=report_data,
+                    file_name=f"defactra_report_{selected_property}.txt",
+                    mime="text/plain",
+                    use_container_width=True
+                )
+            else:
+                st.info("No summary data available yet.")
+
+            st.markdown('</div>', unsafe_allow_html=True)
 
 # ============================================
 # FOOTER
