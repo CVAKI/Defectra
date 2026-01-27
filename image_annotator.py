@@ -1,6 +1,7 @@
 """
-Image Annotation Module for Defactra AI
-Marks and labels defects on property images
+Clean Image Annotation Module for Defactra AI
+Marks defects with numbered markers and detailed legend at bottom
+IMPROVED VERSION - Larger, more visible markers
 """
 
 from PIL import Image, ImageDraw, ImageFont
@@ -8,7 +9,7 @@ import io
 
 def annotate_image_with_defects(image, defects, language='english'):
     """
-    Annotate image with defect markers and labels
+    Annotate image with numbered defect markers and detailed legend
 
     Args:
         image: PIL Image object
@@ -22,53 +23,53 @@ def annotate_image_with_defects(image, defects, language='english'):
     annotated = image.copy()
     draw = ImageDraw.Draw(annotated)
 
-    # Define colors for severity levels
+    # Define colors for severity levels - BRIGHTER, MORE VISIBLE
     severity_colors = {
         'critical': '#FF0066',
         'high': '#FF6600',
-        'medium': '#FFCC00',
+        'medium': '#FFD700',
         'low': '#00FF99'
     }
 
-    # Try to load a font, fallback to default if not available
+    # Try to load a font - LARGER SIZES
     try:
-        # Use a larger font for better visibility
-        font_size = max(20, min(image.width, image.height) // 40)
-        font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", font_size)
-        small_font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", font_size - 4)
+        font_size = max(28, min(image.width, image.height) // 30)  # INCREASED base size
+        marker_font = ImageFont.truetype("arial.ttf", font_size + 8)  # BIGGER markers
+        legend_title_font = ImageFont.truetype("arial.ttf", font_size)  # BIGGER title
+        legend_font = ImageFont.truetype("arial.ttf", font_size - 4)  # BIGGER legend text
     except:
-        font = ImageFont.load_default()
-        small_font = ImageFont.load_default()
+        try:
+            marker_font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", font_size + 8)
+            legend_title_font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", font_size)
+            legend_font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", font_size - 4)
+        except:
+            marker_font = ImageFont.load_default()
+            legend_title_font = ImageFont.load_default()
+            legend_font = ImageFont.load_default()
 
     # Image dimensions
     img_width, img_height = annotated.size
 
-    # If no defects, add a watermark showing the image was analyzed
+    # If no defects, add a watermark
     if not defects:
-        # Add "No Defects Detected" watermark
-        watermark_text = "✓ Analyzed - No Major Defects"
-        bbox = draw.textbbox((0, 0), watermark_text, font=font)
+        watermark_text = "✓ No Major Defects Detected"
+        bbox = draw.textbbox((0, 0), watermark_text, font=marker_font)
         text_width = bbox[2] - bbox[0]
         text_height = bbox[3] - bbox[1]
 
-        # Position at top center
         x = (img_width - text_width) // 2
         y = 30
 
-        # Draw semi-transparent background
-        padding = 10
+        padding = 20  # INCREASED padding
         draw.rectangle(
             [x - padding, y - padding, x + text_width + padding, y + text_height + padding],
-            fill='#00FF9980',
+            fill='#FFFFFF',
             outline='#00FF99',
-            width=2
+            width=5  # THICKER border
         )
-        draw.text((x, y), watermark_text, fill='#FFFFFF', font=font)
+        draw.text((x, y), watermark_text, fill='#000000', font=marker_font)
 
         return annotated
-
-    # Estimate locations and mark defects
-    # Since we don't have exact coordinates, we'll distribute markers intelligently
 
     # Group defects by location keywords
     location_zones = {
@@ -97,155 +98,199 @@ def annotate_image_with_defects(image, defects, language='english'):
         if not categorized:
             location_zones['center'].append((i, defect))
 
-    # Draw markers for each defect
-    marker_positions = []
+    # Calculate legend height needed (before drawing markers)
+    legend_info = []
     marker_number = 1
+
+    for zone, zone_defects in location_zones.items():
+        for defect_idx, defect in zone_defects:
+            defect_name = defect.get('detected_object', 'Defect')
+            severity = defect.get('severity', 'medium').lower()
+            legend_info.append({
+                'number': marker_number,
+                'name': defect_name,
+                'severity': severity,
+                'location': defect.get('location', 'Not specified')
+            })
+            marker_number += 1
+
+    # Calculate legend dimensions - INCREASED spacing
+    line_height = 45  # INCREASED from 35
+    legend_padding = 25  # INCREASED from 20
+    legend_title_height = 50  # INCREASED from 40
+    legend_content_height = len(legend_info) * line_height + 25
+    total_legend_height = legend_title_height + legend_content_height + legend_padding
+
+    # Create new image with space for legend at bottom
+    new_height = img_height + total_legend_height
+    new_image = Image.new('RGB', (img_width, new_height), color='#FFFFFF')
+    new_image.paste(annotated, (0, 0))
+
+    # Update draw object to new image
+    draw = ImageDraw.Draw(new_image)
+
+    # Draw markers on original image area
+    marker_number = 1
+    zone_positions = {
+        'top': (img_width // 2, img_height // 6),
+        'bottom': (img_width // 2, 5 * img_height // 6),
+        'left': (img_width // 6, img_height // 2),
+        'right': (5 * img_width // 6, img_height // 2),
+        'center': (img_width // 2, img_height // 2),
+        'corner': (img_width - 100, 100),
+        'wall': (img_width // 3, img_height // 2),
+        'ceiling': (img_width // 2, 100),
+        'floor': (img_width // 2, img_height - 100)
+    }
 
     for zone, zone_defects in location_zones.items():
         if not zone_defects:
             continue
 
-        # Determine base position for this zone
-        zone_positions = {
-            'top': (img_width // 2, img_height // 6),
-            'bottom': (img_width // 2, 5 * img_height // 6),
-            'left': (img_width // 6, img_height // 2),
-            'right': (5 * img_width // 6, img_height // 2),
-            'center': (img_width // 2, img_height // 2),
-            'corner': (img_width - 100, 100),
-            'wall': (img_width // 3, img_height // 2),
-            'ceiling': (img_width // 2, 100),
-            'floor': (img_width // 2, img_height - 100)
-        }
-
         base_x, base_y = zone_positions.get(zone, (img_width // 2, img_height // 2))
 
-        # Distribute defects in this zone
         for j, (defect_idx, defect) in enumerate(zone_defects):
-            # Calculate position with slight offset for multiple defects in same zone
-            offset = (j - len(zone_defects) // 2) * 80
+            # Calculate position with more spacing
+            offset = (j - len(zone_defects) // 2) * 100  # INCREASED from 80
             x = base_x + offset
-            y = base_y + (j * 30 if len(zone_defects) > 1 else 0)
+            y = base_y + (j * 45 if len(zone_defects) > 1 else 0)  # INCREASED from 35
 
             # Ensure marker stays within image bounds
-            x = max(60, min(x, img_width - 60))
-            y = max(60, min(y, img_height - 60))
+            x = max(80, min(x, img_width - 80))  # INCREASED margin
+            y = max(80, min(y, img_height - 80))
 
             severity = defect.get('severity', 'medium').lower()
             color = severity_colors.get(severity, '#808080')
-
-            # Convert hex color to RGB
             color_rgb = tuple(int(color[i:i+2], 16) for i in (1, 3, 5))
 
-            # Draw marker circle
-            marker_radius = 25
+            # Draw marker circle - MUCH LARGER and MORE VISIBLE
+            marker_radius = 40  # INCREASED from 28
+
+            # Outer white glow - THICKER
             draw.ellipse(
-                [x - marker_radius, y - marker_radius, x + marker_radius, y + marker_radius],
-                fill=color_rgb,
-                outline='#FFFFFF',
-                width=3
+                [x - marker_radius - 6, y - marker_radius - 6,
+                 x + marker_radius + 6, y + marker_radius + 6],
+                fill='#FFFFFF'
             )
 
-            # Draw number in circle
+            # Black border - THICKER
+            draw.ellipse(
+                [x - marker_radius - 3, y - marker_radius - 3,
+                 x + marker_radius + 3, y + marker_radius + 3],
+                fill='#000000'
+            )
+
+            # Colored circle
+            draw.ellipse(
+                [x - marker_radius, y - marker_radius,
+                 x + marker_radius, y + marker_radius],
+                fill=color_rgb
+            )
+
+            # Draw number - WHITE with THICKER black outline
             number_text = str(marker_number)
-            bbox = draw.textbbox((0, 0), number_text, font=font)
+            bbox = draw.textbbox((0, 0), number_text, font=marker_font)
             text_width = bbox[2] - bbox[0]
             text_height = bbox[3] - bbox[1]
+
+            # Black outline - THICKER for better visibility
+            for offset_x in [-3, -2, -1, 0, 1, 2, 3]:  # EXPANDED outline
+                for offset_y in [-3, -2, -1, 0, 1, 2, 3]:
+                    if offset_x != 0 or offset_y != 0:
+                        draw.text(
+                            (x - text_width // 2 + offset_x, y - text_height // 2 + offset_y),
+                            number_text,
+                            fill='#000000',
+                            font=marker_font
+                        )
+
+            # White number
             draw.text(
                 (x - text_width // 2, y - text_height // 2),
                 number_text,
                 fill='#FFFFFF',
-                font=font
+                font=marker_font
             )
 
-            # Draw line to label
-            label_x = x + marker_radius + 10
-            label_y = y
-
-            # Adjust label position if too close to edge
-            if label_x > img_width - 200:
-                label_x = x - marker_radius - 10
-                label_y = y
-
-            draw.line([x + marker_radius, y, label_x, label_y], fill=color_rgb, width=2)
-
-            # Create label text
-            defect_name = defect.get('detected_object', 'Defect')
-            if len(defect_name) > 25:
-                defect_name = defect_name[:22] + '...'
-
-            label_text = f"{marker_number}. {defect_name}"
-            severity_text = defect.get('severity', 'medium').upper()
-
-            # Draw label background
-            bbox = draw.textbbox((0, 0), label_text, font=small_font)
-            label_width = bbox[2] - bbox[0] + 20
-            label_height = bbox[3] - bbox[1] + 30
-
-            # Adjust if label goes out of bounds
-            if label_x + label_width > img_width:
-                label_x = img_width - label_width - 10
-            if label_y + label_height > img_height:
-                label_y = img_height - label_height - 10
-
-            # Draw label box
-            draw.rectangle(
-                [label_x, label_y - 15, label_x + label_width, label_y + label_height - 15],
-                fill=(*color_rgb, 200),
-                outline='#FFFFFF',
-                width=2
-            )
-
-            # Draw text
-            draw.text((label_x + 10, label_y - 10), label_text, fill='#FFFFFF', font=small_font)
-            draw.text((label_x + 10, label_y + 10), severity_text, fill='#FFFFFF', font=small_font)
-
-            marker_positions.append((x, y))
             marker_number += 1
 
-    # Add legend at bottom
-    legend_y = img_height - 120
-    legend_x = 20
+    # Draw legend at bottom
+    legend_start_y = img_height + 15  # INCREASED spacing
 
-    # Draw legend background
+    # Legend background
     draw.rectangle(
-        [10, legend_y - 10, img_width - 10, img_height - 10],
-        fill='#00000080',
-        outline='#FFFFFF',
-        width=2
+        [0, img_height, img_width, new_height],
+        fill='#FFFFFF',
+        outline='#CCCCCC',
+        width=3  # THICKER border
     )
 
-    # Draw legend title
-    draw.text((legend_x, legend_y), "Severity Levels:", fill='#FFFFFF', font=font)
+    # Legend title - BIGGER and BOLDER
+    title_text = "DETECTED DEFECTS:"  # UPPERCASE for visibility
+    draw.text((25, legend_start_y), title_text, fill='#000000', font=legend_title_font)
 
-    # Draw severity indicators
-    legend_items = [
-        ('critical', 'CRITICAL'),
-        ('high', 'HIGH'),
-        ('medium', 'MEDIUM'),
-        ('low', 'LOW')
-    ]
+    # Divider line - THICKER
+    draw.line(
+        [25, legend_start_y + 35, img_width - 25, legend_start_y + 35],
+        fill='#CCCCCC',
+        width=3  # THICKER
+    )
 
-    item_width = (img_width - 40) // len(legend_items)
-    for i, (severity, label) in enumerate(legend_items):
-        color = severity_colors[severity]
+    # Draw each defect entry
+    current_y = legend_start_y + 50  # INCREASED spacing
+
+    for item in legend_info:
+        severity = item['severity']
+        color = severity_colors.get(severity, '#808080')
         color_rgb = tuple(int(color[i:i+2], 16) for i in (1, 3, 5))
 
-        item_x = legend_x + (i * item_width)
-        item_y = legend_y + 30
+        # Number badge - LARGER
+        badge_size = 32  # INCREASED from 24
+        badge_x = 35
+        badge_y = current_y - 3
 
-        # Draw color box
-        draw.rectangle(
-            [item_x, item_y, item_x + 30, item_y + 20],
-            fill=color_rgb,
-            outline='#FFFFFF',
-            width=1
+        # Draw number badge (small circle) - THICKER borders
+        draw.ellipse(
+            [badge_x - 2, badge_y - 2, badge_x + badge_size + 2, badge_y + badge_size + 2],
+            fill='#000000'
+        )
+        draw.ellipse(
+            [badge_x, badge_y, badge_x + badge_size, badge_y + badge_size],
+            fill=color_rgb
         )
 
-        # Draw label
-        draw.text((item_x + 40, item_y), label, fill='#FFFFFF', font=small_font)
+        # Number in badge - LARGER font
+        num_text = str(item['number'])
+        bbox = draw.textbbox((0, 0), num_text, font=legend_font)
+        num_width = bbox[2] - bbox[0]
+        num_height = bbox[3] - bbox[1]
 
-    return annotated
+        draw.text(
+            (badge_x + badge_size // 2 - num_width // 2,
+             badge_y + badge_size // 2 - num_height // 2 - 1),
+            num_text,
+            fill='#FFFFFF',
+            font=legend_font
+        )
+
+        # Defect name - LARGER, BOLDER
+        defect_text = f"{item['name']}"
+        draw.text((badge_x + badge_size + 20, current_y), defect_text, fill='#000000', font=legend_font)
+
+        # Severity indicator - LARGER, BOLDER
+        severity_label = f"[{item['severity'].upper()}]"
+        severity_x = badge_x + badge_size + 20 + 280
+        draw.text((severity_x, current_y), severity_label, fill=color_rgb, font=legend_font)
+
+        # Location (if space permits) - LARGER text
+        if img_width > 800:
+            location_text = f"- {item['location'][:50]}"
+            location_x = severity_x + 120
+            draw.text((location_x, current_y), location_text, fill='#555555', font=legend_font)
+
+        current_y += line_height
+
+    return new_image
 
 def create_thumbnail(image, max_size=(800, 600)):
     """
