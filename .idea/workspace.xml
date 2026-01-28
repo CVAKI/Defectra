@@ -5,9 +5,15 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="95eb3396-8196-4c8d-8f24-b0f69ae44cb2" name="Changes" comment="">
+      <change afterPath="$PROJECT_DIR$/app_with_video.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/video_pdf_generator.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/video_processor.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.streamlit/secrets.toml" beforeDir="false" afterPath="$PROJECT_DIR$/.streamlit/secrets.toml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app.py" beforeDir="false" afterPath="$PROJECT_DIR$/app.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app_pdf.py" beforeDir="false" />
       <change beforePath="$PROJECT_DIR$/image_annotator.py" beforeDir="false" afterPath="$PROJECT_DIR$/image_annotator.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/pdf_report_generator.py" beforeDir="false" afterPath="$PROJECT_DIR$/pdf_report_generator.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -38,6 +44,7 @@
     "Python.app.executor": "Run",
     "Python.app_pdf_integration.executor": "Run",
     "Python.demo_pdf_generation.executor": "Run",
+    "Python.demo_video_processing.executor": "Run",
     "Python.gemini_intagration.executor": "Run",
     "Python.image_annotator.executor": "Run",
     "Python.list_models.executor": "Run",

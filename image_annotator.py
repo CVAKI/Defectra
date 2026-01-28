@@ -1,15 +1,18 @@
 """
-Clean Image Annotation Module for Defactra AI
-Marks defects with numbered markers and detailed legend at bottom
-IMPROVED VERSION - Larger, more visible markers
+Full-Page Image Annotation Module for Defactra AI
+Returns annotated image and STRUCTURED LEGEND DATA (not image)
+Professional format - EXACT SAME as video module
+FIXED: Reduced marker sizes for better balance
 """
 
 from PIL import Image, ImageDraw, ImageFont
 import io
 
+
 def annotate_image_with_defects(image, defects, language='english'):
     """
-    Annotate image with numbered defect markers and detailed legend
+    Annotate image with numbered defect markers ONLY
+    Returns: 1) Annotated image, 2) STRUCTURED legend data (not image)
 
     Args:
         image: PIL Image object
@@ -17,59 +20,68 @@ def annotate_image_with_defects(image, defects, language='english'):
         language: Language for labels
 
     Returns:
-        PIL Image with annotations
+        Tuple of (annotated_image, legend_data)
+        - annotated_image: PIL Image with markers
+        - legend_data: List of dicts with defect details for professional rendering
     """
     # Create a copy to avoid modifying original
     annotated = image.copy()
     draw = ImageDraw.Draw(annotated)
 
-    # Define colors for severity levels - BRIGHTER, MORE VISIBLE
+    # Define colors for severity levels (matching video module)
     severity_colors = {
-        'critical': '#FF0066',
-        'high': '#FF6600',
-        'medium': '#FFD700',
-        'low': '#00FF99'
+        'critical': '#DC2626',  # Red
+        'high': '#F59E0B',      # Orange
+        'medium': '#FCD34D',    # Yellow
+        'low': '#10B981'        # Green
     }
 
-    # Try to load a font - LARGER SIZES
+    severity_labels = {
+        'critical': 'CRITICAL',
+        'high': 'HIGH',
+        'medium': 'MEDIUM',
+        'low': 'LOW'
+    }
+
+    # Try to load fonts - REDUCED SIZES
     try:
-        font_size = max(28, min(image.width, image.height) // 30)  # INCREASED base size
-        marker_font = ImageFont.truetype("arial.ttf", font_size + 8)  # BIGGER markers
-        legend_title_font = ImageFont.truetype("arial.ttf", font_size)  # BIGGER title
-        legend_font = ImageFont.truetype("arial.ttf", font_size - 4)  # BIGGER legend text
+        # Reduced base size calculation for smaller markers
+        base_size = max(18, min(image.width, image.height) // 35)
+        marker_font = ImageFont.truetype("arial.ttf", base_size + 6)
+        watermark_font = ImageFont.truetype("arial.ttf", base_size + 8)
     except:
         try:
-            marker_font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", font_size + 8)
-            legend_title_font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", font_size)
-            legend_font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", font_size - 4)
+            base_size = max(18, min(image.width, image.height) // 35)
+            marker_font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", base_size + 6)
+            watermark_font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", base_size + 8)
         except:
             marker_font = ImageFont.load_default()
-            legend_title_font = ImageFont.load_default()
-            legend_font = ImageFont.load_default()
+            watermark_font = ImageFont.load_default()
 
     # Image dimensions
     img_width, img_height = annotated.size
 
-    # If no defects, add a watermark
+    # If no defects, add a watermark to image only
     if not defects:
         watermark_text = "✓ No Major Defects Detected"
-        bbox = draw.textbbox((0, 0), watermark_text, font=marker_font)
+        bbox = draw.textbbox((0, 0), watermark_text, font=watermark_font)
         text_width = bbox[2] - bbox[0]
         text_height = bbox[3] - bbox[1]
 
         x = (img_width - text_width) // 2
         y = 30
 
-        padding = 20  # INCREASED padding
+        padding = 20  # Reduced padding
         draw.rectangle(
             [x - padding, y - padding, x + text_width + padding, y + text_height + padding],
             fill='#FFFFFF',
             outline='#00FF99',
-            width=5  # THICKER border
+            width=5  # Reduced border width
         )
-        draw.text((x, y), watermark_text, fill='#000000', font=marker_font)
+        draw.text((x, y), watermark_text, fill='#000000', font=watermark_font)
 
-        return annotated
+        # Return image and None for legend data
+        return annotated, None
 
     # Group defects by location keywords
     location_zones = {
@@ -98,38 +110,33 @@ def annotate_image_with_defects(image, defects, language='english'):
         if not categorized:
             location_zones['center'].append((i, defect))
 
-    # Calculate legend height needed (before drawing markers)
-    legend_info = []
+    # Build structured legend data
+    legend_data = []
     marker_number = 1
 
     for zone, zone_defects in location_zones.items():
         for defect_idx, defect in zone_defects:
             defect_name = defect.get('detected_object', 'Defect')
             severity = defect.get('severity', 'medium').lower()
-            legend_info.append({
+            location_text = defect.get('location', 'Not specified')
+            description = defect.get('description', 'No description available')
+            confidence = defect.get('confidence_score', 0)
+
+            legend_data.append({
                 'number': marker_number,
                 'name': defect_name,
                 'severity': severity,
-                'location': defect.get('location', 'Not specified')
+                'severity_label': severity_labels.get(severity, severity.upper()),
+                'severity_color': severity_colors.get(severity, '#808080'),
+                'location': location_text,
+                'description': description,
+                'confidence': confidence
             })
             marker_number += 1
 
-    # Calculate legend dimensions - INCREASED spacing
-    line_height = 45  # INCREASED from 35
-    legend_padding = 25  # INCREASED from 20
-    legend_title_height = 50  # INCREASED from 40
-    legend_content_height = len(legend_info) * line_height + 25
-    total_legend_height = legend_title_height + legend_content_height + legend_padding
-
-    # Create new image with space for legend at bottom
-    new_height = img_height + total_legend_height
-    new_image = Image.new('RGB', (img_width, new_height), color='#FFFFFF')
-    new_image.paste(annotated, (0, 0))
-
-    # Update draw object to new image
-    draw = ImageDraw.Draw(new_image)
-
-    # Draw markers on original image area
+    # ======================================
+    # DRAW MARKERS ON IMAGE ONLY - REDUCED SIZES
+    # ======================================
     marker_number = 1
     zone_positions = {
         'top': (img_width // 2, img_height // 6),
@@ -137,10 +144,10 @@ def annotate_image_with_defects(image, defects, language='english'):
         'left': (img_width // 6, img_height // 2),
         'right': (5 * img_width // 6, img_height // 2),
         'center': (img_width // 2, img_height // 2),
-        'corner': (img_width - 100, 100),
+        'corner': (img_width - 80, 80),  # Reduced from 120
         'wall': (img_width // 3, img_height // 2),
-        'ceiling': (img_width // 2, 100),
-        'floor': (img_width // 2, img_height - 100)
+        'ceiling': (img_width // 2, 80),  # Reduced from 120
+        'floor': (img_width // 2, img_height - 80)  # Reduced from 120
     }
 
     for zone, zone_defects in location_zones.items():
@@ -150,30 +157,30 @@ def annotate_image_with_defects(image, defects, language='english'):
         base_x, base_y = zone_positions.get(zone, (img_width // 2, img_height // 2))
 
         for j, (defect_idx, defect) in enumerate(zone_defects):
-            # Calculate position with more spacing
-            offset = (j - len(zone_defects) // 2) * 100  # INCREASED from 80
+            # Calculate position with spacing - REDUCED SPACING
+            offset = (j - len(zone_defects) // 2) * 70  # Reduced from 120
             x = base_x + offset
-            y = base_y + (j * 45 if len(zone_defects) > 1 else 0)  # INCREASED from 35
+            y = base_y + (j * 35 if len(zone_defects) > 1 else 0)  # Reduced from 60
 
             # Ensure marker stays within image bounds
-            x = max(80, min(x, img_width - 80))  # INCREASED margin
-            y = max(80, min(y, img_height - 80))
+            x = max(60, min(x, img_width - 60))  # Reduced from 100
+            y = max(60, min(y, img_height - 60))  # Reduced from 100
 
             severity = defect.get('severity', 'medium').lower()
             color = severity_colors.get(severity, '#808080')
             color_rgb = tuple(int(color[i:i+2], 16) for i in (1, 3, 5))
 
-            # Draw marker circle - MUCH LARGER and MORE VISIBLE
-            marker_radius = 40  # INCREASED from 28
+            # Draw SMALLER marker circle - SIGNIFICANTLY REDUCED
+            marker_radius = 28  # Reduced from 55 (almost half)
 
-            # Outer white glow - THICKER
+            # Outer white glow - REDUCED
             draw.ellipse(
-                [x - marker_radius - 6, y - marker_radius - 6,
-                 x + marker_radius + 6, y + marker_radius + 6],
+                [x - marker_radius - 5, y - marker_radius - 5,
+                 x + marker_radius + 5, y + marker_radius + 5],
                 fill='#FFFFFF'
             )
 
-            # Black border - THICKER
+            # Black border - REDUCED
             draw.ellipse(
                 [x - marker_radius - 3, y - marker_radius - 3,
                  x + marker_radius + 3, y + marker_radius + 3],
@@ -187,15 +194,15 @@ def annotate_image_with_defects(image, defects, language='english'):
                 fill=color_rgb
             )
 
-            # Draw number - WHITE with THICKER black outline
+            # Draw number with THINNER outline
             number_text = str(marker_number)
             bbox = draw.textbbox((0, 0), number_text, font=marker_font)
             text_width = bbox[2] - bbox[0]
             text_height = bbox[3] - bbox[1]
 
-            # Black outline - THICKER for better visibility
-            for offset_x in [-3, -2, -1, 0, 1, 2, 3]:  # EXPANDED outline
-                for offset_y in [-3, -2, -1, 0, 1, 2, 3]:
+            # Black outline - REDUCED thickness
+            for offset_x in [-2, -1, 0, 1, 2]:  # Reduced from -5 to 5
+                for offset_y in [-2, -1, 0, 1, 2]:  # Reduced from -5 to 5
                     if offset_x != 0 or offset_y != 0:
                         draw.text(
                             (x - text_width // 2 + offset_x, y - text_height // 2 + offset_y),
@@ -214,83 +221,9 @@ def annotate_image_with_defects(image, defects, language='english'):
 
             marker_number += 1
 
-    # Draw legend at bottom
-    legend_start_y = img_height + 15  # INCREASED spacing
+    # Return annotated image and structured legend data
+    return annotated, legend_data
 
-    # Legend background
-    draw.rectangle(
-        [0, img_height, img_width, new_height],
-        fill='#FFFFFF',
-        outline='#CCCCCC',
-        width=3  # THICKER border
-    )
-
-    # Legend title - BIGGER and BOLDER
-    title_text = "DETECTED DEFECTS:"  # UPPERCASE for visibility
-    draw.text((25, legend_start_y), title_text, fill='#000000', font=legend_title_font)
-
-    # Divider line - THICKER
-    draw.line(
-        [25, legend_start_y + 35, img_width - 25, legend_start_y + 35],
-        fill='#CCCCCC',
-        width=3  # THICKER
-    )
-
-    # Draw each defect entry
-    current_y = legend_start_y + 50  # INCREASED spacing
-
-    for item in legend_info:
-        severity = item['severity']
-        color = severity_colors.get(severity, '#808080')
-        color_rgb = tuple(int(color[i:i+2], 16) for i in (1, 3, 5))
-
-        # Number badge - LARGER
-        badge_size = 32  # INCREASED from 24
-        badge_x = 35
-        badge_y = current_y - 3
-
-        # Draw number badge (small circle) - THICKER borders
-        draw.ellipse(
-            [badge_x - 2, badge_y - 2, badge_x + badge_size + 2, badge_y + badge_size + 2],
-            fill='#000000'
-        )
-        draw.ellipse(
-            [badge_x, badge_y, badge_x + badge_size, badge_y + badge_size],
-            fill=color_rgb
-        )
-
-        # Number in badge - LARGER font
-        num_text = str(item['number'])
-        bbox = draw.textbbox((0, 0), num_text, font=legend_font)
-        num_width = bbox[2] - bbox[0]
-        num_height = bbox[3] - bbox[1]
-
-        draw.text(
-            (badge_x + badge_size // 2 - num_width // 2,
-             badge_y + badge_size // 2 - num_height // 2 - 1),
-            num_text,
-            fill='#FFFFFF',
-            font=legend_font
-        )
-
-        # Defect name - LARGER, BOLDER
-        defect_text = f"{item['name']}"
-        draw.text((badge_x + badge_size + 20, current_y), defect_text, fill='#000000', font=legend_font)
-
-        # Severity indicator - LARGER, BOLDER
-        severity_label = f"[{item['severity'].upper()}]"
-        severity_x = badge_x + badge_size + 20 + 280
-        draw.text((severity_x, current_y), severity_label, fill=color_rgb, font=legend_font)
-
-        # Location (if space permits) - LARGER text
-        if img_width > 800:
-            location_text = f"- {item['location'][:50]}"
-            location_x = severity_x + 120
-            draw.text((location_x, current_y), location_text, fill='#555555', font=legend_font)
-
-        current_y += line_height
-
-    return new_image
 
 def create_thumbnail(image, max_size=(800, 600)):
     """
@@ -306,3 +239,179 @@ def create_thumbnail(image, max_size=(800, 600)):
     img_copy = image.copy()
     img_copy.thumbnail(max_size, Image.Resampling.LANCZOS)
     return img_copy
+
+
+def get_severity_display_color(severity):
+    """
+    Get display colors for severity levels
+    EXACT SAME as video module
+
+    Returns tuple of (background_color, text_color)
+    """
+    from reportlab.lib import colors as rl_colors
+
+    severity_colors = {
+        'critical': (rl_colors.HexColor('#DC2626'), rl_colors.white),  # Red
+        'high': (rl_colors.HexColor('#F59E0B'), rl_colors.white),      # Orange
+        'medium': (rl_colors.HexColor('#FCD34D'), rl_colors.black),    # Yellow
+        'low': (rl_colors.HexColor('#10B981'), rl_colors.white),       # Green
+    }
+    return severity_colors.get(severity.lower(), (rl_colors.HexColor('#6B7280'), rl_colors.white))
+
+
+def create_defect_details_section(legend_data, styles):
+    """
+    Create professional defect details section for PDF reports
+    EXACT SAME format as video module's create_defect_details_table
+
+    Args:
+        legend_data: List of defect dicts returned from annotate_image_with_defects
+        styles: ReportLab styles object
+
+    Returns:
+        List of ReportLab elements (tables, paragraphs, spacers)
+    """
+    from reportlab.lib import colors as rl_colors
+    from reportlab.lib.units import inch
+    from reportlab.platypus import Table, TableStyle, Paragraph, Spacer
+
+    elements = []
+
+    if not legend_data:
+        no_defects = Paragraph(
+            "<i>No defects detected in this image</i>",
+            styles['DefectDescription']
+        )
+        elements.append(no_defects)
+        return elements
+
+    # Header for defect details
+    header = Paragraph(
+        f"<b>Defects Detected: {len(legend_data)}</b>",
+        styles['SubsectionHeader']
+    )
+    elements.append(header)
+    elements.append(Spacer(1, 8))
+
+    # Create individual defect cards (same as video module)
+    for idx, defect_info in enumerate(legend_data, 1):
+        defect_elements = create_defect_card(defect_info, idx, styles)
+        elements.extend(defect_elements)
+
+        # Add spacing between defects
+        if idx < len(legend_data):
+            elements.append(Spacer(1, 10))
+
+    return elements
+
+
+def create_defect_card(detection, index, styles):
+    """
+    Create a professional card-style display for a single defect
+    EXACT SAME as video module's create_defect_card function
+
+    Args:
+        detection: Detection dictionary (from legend_data)
+        index: Defect number
+        styles: Report styles
+
+    Returns:
+        List of reportlab elements
+    """
+    from reportlab.lib import colors as rl_colors
+    from reportlab.lib.units import inch
+    from reportlab.platypus import Table, TableStyle, Paragraph
+
+    elements = []
+
+    # Extract detection info - handle both formats
+    if 'name' in detection:
+        # New format (from legend_data)
+        defect_type = detection.get('name', 'Unknown Defect')
+        severity = detection.get('severity', 'medium')
+        confidence = detection.get('confidence', 0)
+        location = detection.get('location', 'Not specified')
+        description = detection.get('description', 'No description available')
+    else:
+        # Old format (direct detection dict)
+        defect_type = detection.get('detected_object', 'Unknown Defect')
+        severity = detection.get('severity', 'medium')
+        confidence = detection.get('confidence_score', 0)
+        location = detection.get('location', 'Not specified')
+        description = detection.get('description', 'No description available')
+
+    # Get colors for severity
+    bg_color, text_color = get_severity_display_color(severity)
+
+    # Create defect header table with colored severity badge
+    header_data = [
+        [
+            Paragraph(f"<b>{index}. {defect_type.upper()}</b>", styles['CustomNormal']),
+            Paragraph(
+                f"<font color='white'><b>{severity.upper()}</b></font>",
+                styles['CustomNormal']
+            )
+        ]
+    ]
+
+    header_table = Table(header_data, colWidths=[4.5 * inch, 1.5 * inch])
+    header_table.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (0, 0), rl_colors.HexColor('#F3F4F6')),
+        ('BACKGROUND', (1, 0), (1, 0), bg_color),
+        ('TEXTCOLOR', (0, 0), (0, 0), rl_colors.HexColor('#1F2937')),
+        ('TEXTCOLOR', (1, 0), (1, 0), text_color),
+        ('ALIGN', (1, 0), (1, 0), 'CENTER'),
+        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+        ('FONTNAME', (0, 0), (-1, -1), 'Helvetica-Bold'),
+        ('FONTSIZE', (0, 0), (-1, -1), 10),
+        ('LEFTPADDING', (0, 0), (-1, -1), 8),
+        ('RIGHTPADDING', (0, 0), (-1, -1), 8),
+        ('TOPPADDING', (0, 0), (-1, -1), 6),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
+        ('BOX', (0, 0), (-1, -1), 1, rl_colors.HexColor('#E5E7EB')),
+    ]))
+
+    elements.append(header_table)
+
+    # Create details table
+    details_data = [
+        ['Location:', location],
+        ['Confidence:', f'{confidence:.1f}%'],
+    ]
+
+    details_table = Table(details_data, colWidths=[1.2 * inch, 4.8 * inch])
+    details_table.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (0, -1), rl_colors.HexColor('#F9FAFB')),
+        ('TEXTCOLOR', (0, 0), (0, -1), rl_colors.HexColor('#6B7280')),
+        ('TEXTCOLOR', (1, 0), (1, -1), rl_colors.HexColor('#1F2937')),
+        ('FONTNAME', (0, 0), (0, -1), 'Helvetica-Bold'),
+        ('FONTNAME', (1, 0), (1, -1), 'Helvetica'),
+        ('FONTSIZE', (0, 0), (-1, -1), 9),
+        ('LEFTPADDING', (0, 0), (-1, -1), 8),
+        ('RIGHTPADDING', (0, 0), (-1, -1), 8),
+        ('TOPPADDING', (0, 0), (-1, -1), 4),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
+        ('GRID', (0, 0), (-1, -1), 0.5, rl_colors.HexColor('#E5E7EB')),
+        ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+    ]))
+
+    elements.append(details_table)
+
+    # Add description in a bordered box
+    description_data = [[Paragraph(f"<b>Description:</b> {description}", styles['DefectDescription'])]]
+
+    description_table = Table(description_data, colWidths=[6 * inch])
+    description_table.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, -1), rl_colors.HexColor('#FFFBEB')),
+        ('TEXTCOLOR', (0, 0), (-1, -1), rl_colors.HexColor('#78350F')),
+        ('LEFTPADDING', (0, 0), (-1, -1), 10),
+        ('RIGHTPADDING', (0, 0), (-1, -1), 10),
+        ('TOPPADDING', (0, 0), (-1, -1), 8),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
+        ('BOX', (0, 0), (-1, -1), 1, rl_colors.HexColor('#FDE68A')),
+        ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+    ]))
+
+    elements.append(description_table)
+
+    return elements

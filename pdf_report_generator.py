@@ -1,10 +1,12 @@
 """
 PDF Report Generator for Defactra AI
-Creates professional, attractive inspection reports with annotated images
+Creates professional inspection reports with annotated images and professional defect cards
+UPDATED to work with new image_annotator format (structured data instead of legend images)
+FIXED: Removed duplicate PageBreak that caused blank page before Recommendations
 """
 
 from reportlab.lib import colors
-from reportlab.lib.pagesizes import A4, letter
+from reportlab.lib.pagesizes import A4
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.units import inch
 from reportlab.platypus import (
@@ -12,13 +14,16 @@ from reportlab.platypus import (
     PageBreak, Image as RLImage, KeepTogether
 )
 from reportlab.lib.enums import TA_CENTER, TA_LEFT, TA_RIGHT, TA_JUSTIFY
-from reportlab.pdfgen import canvas
 from datetime import datetime
 from PIL import Image
 import io
 
 from translations import get_text, get_severity_color
-from image_annotator import annotate_image_with_defects, create_thumbnail
+from image_annotator import (
+    annotate_image_with_defects,
+    create_thumbnail,
+    create_defect_details_section  # NEW: Professional defect cards
+)
 
 
 class DefactraReportTemplate:
@@ -31,16 +36,16 @@ class DefactraReportTemplate:
         """Draw header on each page"""
         canvas.saveState()
 
-        # Header background gradient (simulated with rectangles)
-        canvas.setFillColorRGB(0.06, 0.05, 0.16)  # Dark blue
+        # Header background
+        canvas.setFillColorRGB(0.06, 0.05, 0.16)
         canvas.rect(0, A4[1] - 80, A4[0], 80, fill=1, stroke=0)
 
         # Defactra logo/title
-        canvas.setFillColorRGB(0, 0.96, 1)  # Cyan
+        canvas.setFillColorRGB(0, 0.96, 1)
         canvas.setFont("Helvetica-Bold", 24)
-        canvas.drawString(40, A4[1] - 45, "🔍 DEFACTRA AI")
+        canvas.drawString(40, A4[1] - 45, "DEFACTRA AI")
 
-        canvas.setFillColorRGB(0.63, 0.63, 1)  # Light purple
+        canvas.setFillColorRGB(0.63, 0.63, 1)
         canvas.setFont("Helvetica", 10)
         canvas.drawString(40, A4[1] - 65, get_text('generated_by', self.language))
 
@@ -60,7 +65,7 @@ class DefactraReportTemplate:
         disclaimer = get_text('disclaimer', self.language)
         canvas.drawCentredString(A4[0] / 2, 30, disclaimer)
 
-        # Page number (just show current page since total pages not available yet)
+        # Page number
         canvas.setFont("Helvetica-Bold", 9)
         page_text = f"{get_text('page', self.language)} {doc.page}"
         canvas.drawRightString(A4[0] - 40, 15, page_text)
@@ -69,7 +74,7 @@ class DefactraReportTemplate:
 
 
 def create_custom_styles(language='english'):
-    """Create custom paragraph styles matching web theme"""
+    """Create custom paragraph styles"""
     styles = getSampleStyleSheet()
 
     # Title style
@@ -115,7 +120,18 @@ def create_custom_styles(language='english'):
         alignment=TA_JUSTIFY
     ))
 
-    # Defect description
+    # Defect description (for professional cards)
+    styles.add(ParagraphStyle(
+        name='DefectDescription',
+        parent=styles['Normal'],
+        fontSize=9,
+        textColor=colors.HexColor('#404040'),
+        spaceAfter=4,
+        leftIndent=10,
+        alignment=TA_LEFT
+    ))
+
+    # Defect desc (for old format compatibility)
     styles.add(ParagraphStyle(
         name='DefectDesc',
         parent=styles['Normal'],
@@ -136,7 +152,7 @@ def generate_pdf_report(
         output_path=None
 ):
     """
-    Generate comprehensive PDF report
+    Generate comprehensive PDF report with annotated images and professional defect cards
 
     Args:
         property_data: Dictionary with property information
@@ -176,7 +192,6 @@ def generate_pdf_report(
     # TITLE PAGE
     # ==========================================
 
-    # Main title
     title = Paragraph(
         get_text('report_title', language),
         styles['CustomTitle']
@@ -202,7 +217,6 @@ def generate_pdf_report(
     story.append(Paragraph(get_text('property_details', language), styles['SectionHeader']))
     story.append(Spacer(1, 10))
 
-    # Property details table
     property_details = [
         [get_text('address', language), property_data.get('address', 'N/A')],
         [get_text('city', language), property_data.get('city', 'N/A')],
@@ -222,8 +236,8 @@ def generate_pdf_report(
         ('FONTSIZE', (0, 0), (-1, -1), 10),
         ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#CCCCCC')),
         ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-        ('LEFTPADDING', (0, 0), (-1, -1), 10),
-        ('RIGHTPADDING', (0, 0), (-1, -1), 10),
+        ('LEFTPADDING', (0, 0), (-1, -1), 12),
+        ('RIGHTPADDING', (0, 0), (-1, -1), 12),
         ('TOPPADDING', (0, 0), (-1, -1), 8),
         ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
     ]))
@@ -272,7 +286,7 @@ def generate_pdf_report(
         ('BOTTOMPADDING', (0, 0), (-1, -1), 10),
     ]))
 
-    # Add color coding for severity counts
+    # Color coding for severity
     if critical_count > 0:
         summary_table.setStyle(TableStyle([
             ('BACKGROUND', (1, 3), (1, 3), colors.HexColor('#FF0066')),
@@ -296,7 +310,8 @@ def generate_pdf_report(
     story.append(Spacer(1, 20))
 
     # ==========================================
-    # ANNOTATED IMAGES
+    # ANNOTATED IMAGES WITH PROFESSIONAL DEFECT CARDS
+    # (NEW FORMAT - Using structured data)
     # ==========================================
 
     if images:
@@ -305,19 +320,20 @@ def generate_pdf_report(
         story.append(Spacer(1, 10))
 
         for idx, img in enumerate(images, 1):
-            # Annotate image with defect markers
-            annotated_img = annotate_image_with_defects(img, defects, language)
+            # Annotate image - NOW RETURNS (annotated_img, legend_data)
+            # legend_data is a LIST of defect dictionaries, NOT an image
+            annotated_img, legend_data = annotate_image_with_defects(img, defects, language)
 
-            # Create thumbnail for PDF
-            thumbnail = create_thumbnail(annotated_img, max_size=(500, 400))
+            # PAGE 1: ANNOTATED IMAGE with markers
+            img_thumbnail = create_thumbnail(annotated_img, max_size=(600, 500))
 
             # Convert to ReportLab Image
             img_buffer = io.BytesIO()
-            thumbnail.save(img_buffer, format='PNG')
+            img_thumbnail.save(img_buffer, format='PNG')
             img_buffer.seek(0)
 
-            # Add to PDF
-            rl_img = RLImage(img_buffer, width=5 * inch, height=4 * inch, kind='proportional')
+            # Make image as large as possible on page
+            rl_img = RLImage(img_buffer, width=6.5 * inch, height=5 * inch, kind='proportional')
 
             caption = Paragraph(
                 f"<b>{get_text('defect_analysis', language)} - Image {idx}</b>",
@@ -327,72 +343,36 @@ def generate_pdf_report(
             story.append(KeepTogether([caption, Spacer(1, 5), rl_img]))
             story.append(Spacer(1, 15))
 
-    # ==========================================
-    # DETAILED DEFECT INFORMATION
-    # ==========================================
+            # PAGE 2: PROFESSIONAL DEFECT CARDS (using structured data)
+            if legend_data is not None and len(legend_data) > 0:
+                # Add section header
+                defects_header = Paragraph(
+                    f"<b>Defect Details - Image {idx}</b>",
+                    styles['SubsectionHeader']
+                )
+                story.append(defects_header)
+                story.append(Spacer(1, 10))
 
-    if defects:
-        story.append(PageBreak())
-        story.append(Paragraph(get_text('defect_details', language), styles['SectionHeader']))
-        story.append(Spacer(1, 10))
+                # Use the professional defect cards function from image_annotator
+                defect_elements = create_defect_details_section(legend_data, styles)
+                for element in defect_elements:
+                    story.append(element)
 
-        # Group by severity
-        severity_order = ['critical', 'high', 'medium', 'low']
-        for severity in severity_order:
-            severity_defects = [d for d in defects if d.get('severity', '').lower() == severity]
-
-            if not severity_defects:
-                continue
-
-            # Severity subsection
-            severity_text = get_text(severity, language)
-            story.append(Paragraph(
-                f"{severity_text} ({len(severity_defects)})",
-                styles['SubsectionHeader']
-            ))
-            story.append(Spacer(1, 8))
-
-            for i, defect in enumerate(severity_defects, 1):
-                # Defect card
-                defect_name = defect.get('detected_object', 'Unknown Defect')
-                location = defect.get('location', 'Not specified')
-                confidence = defect.get('confidence_score', 0)
-                description = defect.get('description', 'No description available')
-                impact = defect.get('estimated_impact', 'Unknown impact')
-                priority = defect.get('repair_priority', 'routine')
-
-                # Build defect info
-                defect_info = f"""
-                <b>{i}. {defect_name}</b><br/>
-                <b>{get_text('location', language)}:</b> {location}<br/>
-                <b>{get_text('confidence', language)}:</b> {confidence:.1f}%<br/>
-                <b>{get_text('repair_priority', language)}:</b> {get_text(priority, language)}<br/>
-                <b>{get_text('description', language)}:</b> {description}<br/>
-                <b>{get_text('impact', language)}:</b> {impact}
-                """
-
-                story.append(Paragraph(defect_info, styles['DefectDesc']))
-
-                # Add colored bar
-                severity_color = get_severity_color(severity)
-                bar_data = [['']]
-                bar_table = Table(bar_data, colWidths=[5.5 * inch], rowHeights=[3])
-                bar_table.setStyle(TableStyle([
-                    ('BACKGROUND', (0, 0), (-1, -1), colors.HexColor(severity_color)),
-                    ('LINEBELOW', (0, 0), (-1, -1), 2, colors.HexColor(severity_color)),
-                ]))
-                story.append(bar_table)
-                story.append(Spacer(1, 12))
+                # ⭐ FIXED: Only add PageBreak if this is NOT the last image
+                # This prevents a blank page before recommendations
+                if idx < len(images):
+                    story.append(PageBreak())  # Only between images, not after last one
 
     # ==========================================
     # RECOMMENDATIONS
+    # ⭐ FIXED: Single PageBreak here (removed duplicate)
     # ==========================================
 
-    story.append(PageBreak())
+    story.append(PageBreak())  # Only ONE PageBreak before recommendations
     story.append(Paragraph(get_text('recommendations', language), styles['SectionHeader']))
     story.append(Spacer(1, 10))
 
-    # Generate recommendations based on defects
+    # Generate recommendations
     recommendations = []
 
     if critical_count > 0:
