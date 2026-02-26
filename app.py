@@ -599,25 +599,14 @@ def analyze_image_with_ai(image):
 # HEADER WITH LANGUAGE SELECTOR
 # ============================================
 st.markdown('<h1 class="main-header">Defactra AI</h1>', unsafe_allow_html=True)
-st.markdown('<p class="subtitle">Intelligent Defect Detection & Property Risk Analysis Platform <span class="video-badge">🎥 NEW: VIDEO</span></p>',
+st.markdown('<p class="subtitle"><span class="video-badge">Intelligent Defect Detection & Property Risk Analysis Platform </span></p>',
             unsafe_allow_html=True)
 
 # Language selector in a prominent position
 col1, col2, col3 = st.columns([2, 1, 2])
 with col2:
-    st.markdown('<div class="language-card">', unsafe_allow_html=True)
-    language_options = {
-        '🇬🇧 English': 'english',
-        '🇮🇳 മലയാളം': 'malayalam',
-        '🇮🇳 हिंदी': 'hindi'
-    }
-    selected_lang = st.selectbox(
-        "🌐 Language",
-        options=list(language_options.keys()),
-        index=list(language_options.values()).index(st.session_state.language),
-        key='language_selector'
-    )
-    st.session_state.language = language_options[selected_lang]
+
+    st.session_state.language = 'english'
     st.markdown('</div>', unsafe_allow_html=True)
 
 st.markdown("---")

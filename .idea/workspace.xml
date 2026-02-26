@@ -5,14 +5,12 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="95eb3396-8196-4c8d-8f24-b0f69ae44cb2" name="Changes" comment="">
-      <change afterPath="$PROJECT_DIR$/app_with_video.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/video_pdf_generator.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/video_processor.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/install_fonts.sh" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/pdf_report_generator_workaround.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/test_fonts.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.streamlit/secrets.toml" beforeDir="false" afterPath="$PROJECT_DIR$/.streamlit/secrets.toml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/app.py" beforeDir="false" afterPath="$PROJECT_DIR$/app.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/app_pdf.py" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/image_annotator.py" beforeDir="false" afterPath="$PROJECT_DIR$/image_annotator.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/pdf_report_generator.py" beforeDir="false" afterPath="$PROJECT_DIR$/pdf_report_generator.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
@@ -30,33 +28,36 @@
   <component name="Git.Settings">
     <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
   </component>
-  <component name="ProjectColorInfo"><![CDATA[{
-  "associatedIndex": 1
-}]]></component>
+  <component name="ProjectColorInfo">{
+  &quot;associatedIndex&quot;: 1
+}</component>
   <component name="ProjectId" id="38plFKiiq8oTC4VIvAesNv9XZXe" />
   <component name="ProjectViewState">
     <option name="hideEmptyMiddlePackages" value="true" />
     <option name="showLibraryContents" value="true" />
   </component>
-  <component name="PropertiesComponent"><![CDATA[{
-  "keyToString": {
-    "ModuleVcsDetector.initialDetectionPerformed": "true",
-    "Python.app.executor": "Run",
-    "Python.app_pdf_integration.executor": "Run",
-    "Python.demo_pdf_generation.executor": "Run",
-    "Python.demo_video_processing.executor": "Run",
-    "Python.gemini_intagration.executor": "Run",
-    "Python.image_annotator.executor": "Run",
-    "Python.list_models.executor": "Run",
-    "Python.pdf_report_generator.executor": "Run",
-    "Python.test_connection.executor": "Run",
-    "Python.test_gemini.executor": "Run",
-    "Python.translations.executor": "Run",
-    "RunOnceActivity.ShowReadmeOnStart": "true",
-    "RunOnceActivity.git.unshallow": "true",
-    "git-widget-placeholder": "main"
+  <component name="PropertiesComponent">{
+  &quot;keyToString&quot;: {
+    &quot;ModuleVcsDetector.initialDetectionPerformed&quot;: &quot;true&quot;,
+    &quot;Python.app.executor&quot;: &quot;Run&quot;,
+    &quot;Python.app_pdf_integration.executor&quot;: &quot;Run&quot;,
+    &quot;Python.demo_pdf_generation.executor&quot;: &quot;Run&quot;,
+    &quot;Python.demo_video_processing.executor&quot;: &quot;Run&quot;,
+    &quot;Python.gemini_intagration.executor&quot;: &quot;Run&quot;,
+    &quot;Python.image_annotator.executor&quot;: &quot;Run&quot;,
+    &quot;Python.list_models.executor&quot;: &quot;Run&quot;,
+    &quot;Python.pdf_report_generator.executor&quot;: &quot;Run&quot;,
+    &quot;Python.pdf_report_generator_workaround.executor&quot;: &quot;Run&quot;,
+    &quot;Python.test_connection.executor&quot;: &quot;Run&quot;,
+    &quot;Python.test_fonts.executor&quot;: &quot;Run&quot;,
+    &quot;Python.test_gemini.executor&quot;: &quot;Run&quot;,
+    &quot;Python.translations.executor&quot;: &quot;Run&quot;,
+    &quot;RunOnceActivity.ShowReadmeOnStart&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.git.unshallow&quot;: &quot;true&quot;,
+    &quot;SHELLCHECK.PATH&quot;: &quot;C:\\Users\\SIVANAND\\AppData\\Roaming\\JetBrains\\PyCharm2025.1\\plugins\\Shell Script\\shellcheck.exe&quot;,
+    &quot;git-widget-placeholder&quot;: &quot;main&quot;
   }
-}]]></component>
+}</component>
   <component name="RecentsManager">
     <key name="MoveFile.RECENT_KEYS">
       <recent name="C:\Users\SIVANAND\Desktop\defatra" />
