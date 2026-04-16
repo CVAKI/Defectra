@@ -1,0 +1,55 @@
+CREATE DATABASE PROPERTY_INSPECTION;
+CREATE SCHEMA PROPERTY_INSPECTION.INSPECTION_DATA;
+USE DATABASE PROPERTY_INSPECTION;
+USE SCHEMA INSPECTION_DATA;
+
+CREATE TABLE properties (
+    property_id VARCHAR,
+    address VARCHAR,
+    city VARCHAR,
+    property_type VARCHAR,
+    bedrooms INT,
+    area_sqft INT,
+    year_built INT
+);
+
+CREATE TABLE rooms (
+    room_id VARCHAR,
+    property_id VARCHAR,
+    room_name VARCHAR
+);
+
+CREATE TABLE findings (
+    finding_id VARCHAR,
+    room_id VARCHAR,
+    finding_text VARCHAR,
+    inspector_notes VARCHAR,
+    detection_id VARCHAR
+);
+
+CREATE TABLE ai_detections (
+    detection_id VARCHAR,
+    detected_object VARCHAR,
+    severity VARCHAR,
+    confidence_score FLOAT
+);
+
+CREATE TABLE property_risk_scores (
+    property_id VARCHAR,
+    address VARCHAR,
+    property_risk_score FLOAT,
+    property_grade VARCHAR
+);
+
+CREATE TABLE room_risk_scores (
+    room_id VARCHAR,
+    property_id VARCHAR,
+    room_name VARCHAR,
+    risk_score FLOAT
+);
+
+CREATE TABLE inspection_summaries (
+    summary_id VARCHAR,
+    property_id VARCHAR,
+    summary_text VARCHAR
+);
