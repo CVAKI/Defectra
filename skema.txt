@@ -1,55 +1,129 @@
-CREATE DATABASE PROPERTY_INSPECTION;
-CREATE SCHEMA PROPERTY_INSPECTION.INSPECTION_DATA;
+-- ================================================================
+-- Defactra AI - Complete Snowflake Schema (Fresh Setup)
+-- Run this entire script in your NEW Snowflake account worksheet
+-- ================================================================
+
+-- ----------------------------------------------------------------
+-- STEP 1: Database & Schema
+-- ----------------------------------------------------------------
+CREATE DATABASE IF NOT EXISTS PROPERTY_INSPECTION;
+CREATE SCHEMA IF NOT EXISTS PROPERTY_INSPECTION.INSPECTION_DATA;
+
 USE DATABASE PROPERTY_INSPECTION;
 USE SCHEMA INSPECTION_DATA;
 
-CREATE TABLE properties (
-    property_id VARCHAR,
-    address VARCHAR,
-    city VARCHAR,
-    property_type VARCHAR,
-    bedrooms INT,
-    area_sqft INT,
-    year_built INT
+
+-- ----------------------------------------------------------------
+-- STEP 2: Core Tables
+-- ----------------------------------------------------------------
+
+-- Properties (the buildings being inspected)
+CREATE OR REPLACE TABLE properties (
+    property_id     VARCHAR         NOT NULL PRIMARY KEY,
+    address         VARCHAR,
+    city            VARCHAR,
+    property_type   VARCHAR,        -- e.g. 'Villa', 'Apartment', 'Commercial'
+    bedrooms        INT,
+    area_sqft       INT,
+    year_built      INT
 );
 
-CREATE TABLE rooms (
-    room_id VARCHAR,
-    property_id VARCHAR,
-    room_name VARCHAR
+-- Rooms (each room within a property)
+CREATE OR REPLACE TABLE rooms (
+    room_id         VARCHAR         NOT NULL PRIMARY KEY,
+    property_id     VARCHAR,        -- FK -> properties.property_id
+    room_name       VARCHAR,        -- e.g. 'Master Bedroom'
+    room_type       VARCHAR,        -- e.g. 'bedroom', 'kitchen', 'bathroom'
+    floor_number    INT DEFAULT 0
 );
 
-CREATE TABLE findings (
-    finding_id VARCHAR,
-    room_id VARCHAR,
-    finding_text VARCHAR,
-    inspector_notes VARCHAR,
-    detection_id VARCHAR
+-- Uploaded images (base64 stored per inspection session)
+CREATE OR REPLACE TABLE uploaded_images (
+    upload_id           VARCHAR         NOT NULL PRIMARY KEY,
+    property_id         VARCHAR,        -- FK -> properties.property_id
+    room_name           VARCHAR,
+    upload_timestamp    TIMESTAMP_NTZ   DEFAULT CURRENT_TIMESTAMP(),
+    image_data          TEXT,           -- base64-encoded image content
+    image_format        VARCHAR,        -- 'png', 'jpeg', etc.
+    file_size_kb        INT,
+    uploaded_by         VARCHAR DEFAULT 'web_user'
 );
 
-CREATE TABLE ai_detections (
-    detection_id VARCHAR,
-    detected_object VARCHAR,
-    severity VARCHAR,
-    confidence_score FLOAT
+-- AI Detections (one row per defect found by Gemini)
+CREATE OR REPLACE TABLE ai_detections (
+    detection_id        VARCHAR         NOT NULL PRIMARY KEY,
+    upload_id           VARCHAR,        -- FK -> uploaded_images.upload_id
+    detected_object     VARCHAR,        -- e.g. 'vertical hairline crack in drywall'
+    confidence_score    FLOAT,          -- 0-100
+    bounding_box        VARCHAR,        -- JSON string or empty string
+    severity            VARCHAR,        -- 'critical' | 'high' | 'medium' | 'low'
+    description         TEXT,           -- 2-3 sentence Gemini description
+    detection_timestamp TIMESTAMP_NTZ   DEFAULT CURRENT_TIMESTAMP()
 );
 
-CREATE TABLE property_risk_scores (
-    property_id VARCHAR,
-    address VARCHAR,
-    property_risk_score FLOAT,
-    property_grade VARCHAR
+-- Findings (links a detection to a room; supports manual inspector notes too)
+CREATE OR REPLACE TABLE findings (
+    finding_id      VARCHAR         NOT NULL PRIMARY KEY,
+    room_id         VARCHAR,        -- FK -> rooms.room_id
+    inspection_date DATE            DEFAULT CURRENT_DATE(),
+    finding_text    VARCHAR,        -- short label of the defect
+    inspector_notes TEXT,           -- detailed notes / Gemini description
+    detection_id    VARCHAR,        -- FK -> ai_detections.detection_id
+    upload_id       VARCHAR,        -- FK -> uploaded_images.upload_id
+    ai_generated    BOOLEAN         DEFAULT FALSE
 );
 
-CREATE TABLE room_risk_scores (
-    room_id VARCHAR,
-    property_id VARCHAR,
-    room_name VARCHAR,
-    risk_score FLOAT
+
+-- ----------------------------------------------------------------
+-- STEP 3: Risk Score Tables
+--         (populated by your app after analysis)
+-- ----------------------------------------------------------------
+
+-- Property-level risk summary
+CREATE OR REPLACE TABLE property_risk_scores (
+    property_id             VARCHAR         NOT NULL PRIMARY KEY,
+    address                 VARCHAR,
+    property_risk_score     FLOAT,          -- 0-100
+    property_grade          VARCHAR,        -- 'A' | 'B' | 'C' | 'D' | 'F'
+    property_risk_category  VARCHAR,        -- 'Low Risk' | 'Medium Risk' | 'High Risk'
+    total_defects           INT DEFAULT 0,
+    total_critical          INT DEFAULT 0,
+    high_risk_rooms         INT DEFAULT 0,
+    total_rooms             INT DEFAULT 0
 );
 
-CREATE TABLE inspection_summaries (
-    summary_id VARCHAR,
-    property_id VARCHAR,
-    summary_text VARCHAR
+-- Room-level risk summary
+CREATE OR REPLACE TABLE room_risk_scores (
+    room_id         VARCHAR         NOT NULL PRIMARY KEY,
+    property_id     VARCHAR,        -- FK -> properties.property_id
+    room_name       VARCHAR,
+    room_type       VARCHAR,
+    room_risk_score FLOAT,          -- 0-100
+    risk_category   VARCHAR,        -- 'Low Risk' | 'Medium Risk' | 'High Risk'
+    total_defects   INT DEFAULT 0,
+    critical_count  INT DEFAULT 0,
+    high_count      INT DEFAULT 0,
+    medium_count    INT DEFAULT 0
 );
+
+-- Overall inspection summary text (AI-generated narrative)
+CREATE OR REPLACE TABLE inspection_summaries (
+    summary_id      VARCHAR         NOT NULL PRIMARY KEY,
+    property_id     VARCHAR,        -- FK -> properties.property_id
+    summary_text    TEXT
+);
+
+
+-- ----------------------------------------------------------------
+-- STEP 4: Verify everything was created correctly
+-- ----------------------------------------------------------------
+SHOW TABLES;
+
+DESCRIBE TABLE properties;
+DESCRIBE TABLE rooms;
+DESCRIBE TABLE uploaded_images;
+DESCRIBE TABLE ai_detections;
+DESCRIBE TABLE findings;
+DESCRIBE TABLE property_risk_scores;
+DESCRIBE TABLE room_risk_scores;
+DESCRIBE TABLE inspection_summaries;

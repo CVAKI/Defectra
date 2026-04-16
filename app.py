@@ -578,6 +578,9 @@ def get_snowflake_connection():
 
 conn = get_snowflake_connection()
 
+# ADD THESE 2 LINES HERE:
+conn.cursor().execute("USE DATABASE PROPERTY_INSPECTION")
+conn.cursor().execute("USE SCHEMA INSPECTION_DATA")
 
 # ============================================
 # HELPER FUNCTIONS
