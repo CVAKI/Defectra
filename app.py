@@ -588,6 +588,10 @@ conn.cursor().execute("USE SCHEMA INSPECTION_DATA")
 
 def image_to_base64(image):
     """Convert PIL Image to base64 string"""
+    # Fix: if a list is passed, take the first image
+    if isinstance(image, list):
+        image = image[0]
+
     buffered = io.BytesIO()
     image.save(buffered, format="PNG")
     return base64.b64encode(buffered.getvalue()).decode()
@@ -595,6 +599,10 @@ def image_to_base64(image):
 
 def analyze_image_with_ai(image):
     """AI-Powered Property Inspection using FREE Google Gemini API"""
+    # Fix: if a list is passed, take the first image
+    if isinstance(image, list):
+        image = image[0]
+
     return analyze_image_with_gemini(image)
 
 
@@ -1661,8 +1669,8 @@ elif app_mode == "📊 View Existing Reports":
                         image_data = base64.b64decode(img_row['image_data'])
                         original_image = Image.open(io.BytesIO(image_data))
 
-                        # Annotate image with defects
-                        annotated_image = annotate_image_with_defects(
+                        # Annotate image with defects (returns tuple: image, legend_data)
+                        annotated_image, legend_data = annotate_image_with_defects(
                             original_image,
                             defects_list,
                             st.session_state.language
