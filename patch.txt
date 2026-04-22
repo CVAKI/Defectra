@@ -1,0 +1,272 @@
+Defactra AI - app.py PATCH
+===========================
+This file shows exactly what to change in app.py to fix the three broken tabs:
+  📊 Dashboard  |  📈 Risk Analysis  |  📝 Summary Report
+
+There are TWO parts:
+
+  PART A – Add to the "New Inspection" save flow (runs ONCE after each inspection)
+  PART B – Replace the broken tab rendering code in "View Existing Reports"
+
+──────────────────────────────────────────────────────────────────────────────
+PART A  ─  Call this right after you finish saving findings/detections
+──────────────────────────────────────────────────────────────────────────────
+
+In app.py, find the block where you save the last detection/finding to Snowflake,
+then ADD the following two lines immediately after conn.commit():
+
+    from save_risk_data import save_all_risk_data
+    save_all_risk_data(conn, property_id)
+
+That's it for Part A.  The function computes scores for every room, writes to
+property_risk_scores, room_risk_scores, and inspection_summaries automatically.
+
+──────────────────────────────────────────────────────────────────────────────
+PART B  ─  Replace the broken tab bodies in "View Existing Reports" mode
+──────────────────────────────────────────────────────────────────────────────
+
+Find the tabs block that looks like:
+    tab1, tab2, tab3, tab4, tab5 = st.tabs(["📊 Dashboard", "🤖 AI Detection", ...])
+
+Then replace the bodies of tab1 (Dashboard), tab4 (Risk Analysis),
+and tab5 (Summary Report) with the code below.
+"""
+
+# ─────────────────────────────────────────────────────────────────
+# ADD THIS IMPORT at the top of app.py  (after existing imports)
+# ─────────────────────────────────────────────────────────────────
+from save_risk_data import (
+    fetch_property_overview,
+    fetch_room_risk_scores,
+    fetch_inspection_summary,
+)
+import plotly.graph_objects as go
+import plotly.express as px
+
+# ─────────────────────────────────────────────────────────────────
+# TAB 1 – 📊 Dashboard   (replace the existing tab1 body)
+# ─────────────────────────────────────────────────────────────────
+
+def render_dashboard_tab(conn, selected_property):
+    overview_df = fetch_property_overview(conn, selected_property)
+
+    if overview_df.empty:
+        st.warning("⚠️ No risk analysis data for this property yet.")
+        st.info("💡 Re-run an inspection for this property to generate risk data, "
+                "or run `backfill_risk_scores.py` to populate from existing detections.")
+        return
+
+    row = overview_df.iloc[0]
+
+    # ── Top metrics ────────────────────────────────────────────────
+    col1, col2, col3, col4 = st.columns(4)
+    with col1:
+        st.metric("🏠 Risk Score",
+                  f"{row['property_risk_score']:.1f}/100",
+                  help="Higher = better condition")
+    with col2:
+        st.metric("📊 Grade", row['property_grade'])
+    with col3:
+        st.metric("⚠️ Total Defects", int(row['total_defects']))
+    with col4:
+        st.metric("🚨 Critical Issues", int(row['total_critical']))
+
+    st.markdown("---")
+
+    # ── Property details ───────────────────────────────────────────
+    col_a, col_b = st.columns(2)
+    with col_a:
+        st.markdown("### 🏡 Property Details")
+        st.markdown(f"**Address:** {row.get('address', 'N/A')}, {row.get('city', '')}")
+        st.markdown(f"**Type:** {row.get('property_type', 'N/A')}")
+        st.markdown(f"**Bedrooms:** {row.get('bedrooms', 'N/A')}")
+        st.markdown(f"**Area:** {row.get('area_sqft', 'N/A')} sq ft")
+        st.markdown(f"**Year Built:** {row.get('year_built', 'N/A')}")
+
+    with col_b:
+        st.markdown("### 📈 Risk Overview")
+        score = float(row['property_risk_score'])
+        fig = go.Figure(go.Indicator(
+            mode="gauge+number",
+            value=score,
+            domain={"x": [0, 1], "y": [0, 1]},
+            title={"text": "Condition Score"},
+            gauge={
+                "axis": {"range": [0, 100]},
+                "bar": {"color": "#00f5ff"},
+                "steps": [
+                    {"range": [0, 35],  "color": "#FF0066"},
+                    {"range": [35, 55], "color": "#FF6600"},
+                    {"range": [55, 75], "color": "#FFCC00"},
+                    {"range": [75, 100],"color": "#00FF99"},
+                ],
+            },
+        ))
+        fig.update_layout(
+            height=250,
+            paper_bgcolor="rgba(0,0,0,0)",
+            font_color="white",
+            margin=dict(l=20, r=20, t=30, b=20),
+        )
+        st.plotly_chart(fig, use_container_width=True)
+
+    # ── Room breakdown ─────────────────────────────────────────────
+    st.markdown("---")
+    st.markdown("### 🚪 Room Risk Breakdown")
+    rooms_df = fetch_room_risk_scores(conn, selected_property)
+    if not rooms_df.empty:
+        def color_risk(val):
+            colors = {"High Risk": "background-color: #FF006630",
+                      "Medium Risk": "background-color: #FFCC0030",
+                      "Low Risk": "background-color: #00FF9930"}
+            return colors.get(val, "")
+
+        display_df = rooms_df.rename(columns={
+            "room_name": "Room", "room_type": "Type",
+            "room_risk_score": "Score", "risk_category": "Category",
+            "total_defects": "Defects", "critical_count": "Critical",
+            "high_count": "High", "medium_count": "Medium",
+        })
+        st.dataframe(
+            display_df.style.applymap(color_risk, subset=["Category"]),
+            use_container_width=True,
+            hide_index=True,
+        )
+    else:
+        st.info("No room data yet.")
+
+
+# ─────────────────────────────────────────────────────────────────
+# TAB 4 – 📈 Risk Analysis   (replace the existing tab4 body)
+# ─────────────────────────────────────────────────────────────────
+
+def render_risk_tab(conn, selected_property):
+    overview_df = fetch_property_overview(conn, selected_property)
+    rooms_df    = fetch_room_risk_scores(conn, selected_property)
+
+    if overview_df.empty:
+        st.warning("⚠️ No risk analysis data for this property yet.")
+        st.info("Run `backfill_risk_scores.py` once to populate from existing detections.")
+        return
+
+    row = overview_df.iloc[0]
+
+    st.markdown(f"### 📊 Risk Category: **{row['property_risk_category']}**")
+    st.progress(int(row['property_risk_score']) / 100)
+
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        st.metric("🚨 Critical", int(row['total_critical']),
+                  help="Immediate action required")
+    with col2:
+        st.metric("🔴 High-Risk Rooms", int(row['high_risk_rooms']))
+    with col3:
+        st.metric("🚪 Total Rooms", int(row['total_rooms']))
+
+    if not rooms_df.empty:
+        st.markdown("---")
+        st.markdown("### 🏠 Room Risk Distribution")
+        fig = px.bar(
+            rooms_df,
+            x="room_name",
+            y="room_risk_score",
+            color="risk_category",
+            color_discrete_map={
+                "High Risk":   "#FF0066",
+                "Medium Risk": "#FFCC00",
+                "Low Risk":    "#00FF99",
+            },
+            title="Room Condition Scores (higher = better)",
+            labels={"room_name": "Room", "room_risk_score": "Score"},
+        )
+        fig.update_layout(
+            paper_bgcolor="rgba(0,0,0,0)",
+            plot_bgcolor="rgba(0,0,0,0.1)",
+            font_color="white",
+        )
+        st.plotly_chart(fig, use_container_width=True)
+
+        st.markdown("### ⚠️ Defect Breakdown per Room")
+        for _, r in rooms_df.iterrows():
+            cat_color = {"High Risk": "🔴", "Medium Risk": "🟡", "Low Risk": "🟢"}.get(
+                r["risk_category"], "⚪"
+            )
+            with st.expander(f"{cat_color} {r['room_name']} — {r['risk_category']}  (score: {r['room_risk_score']:.1f})"):
+                c1, c2, c3, c4 = st.columns(4)
+                c1.metric("Total",    int(r["total_defects"]))
+                c2.metric("Critical", int(r["critical_count"]))
+                c3.metric("High",     int(r["high_count"]))
+                c4.metric("Medium",   int(r["medium_count"]))
+
+
+# ─────────────────────────────────────────────────────────────────
+# TAB 5 – 📝 Summary Report   (replace the existing tab5 body)
+# ─────────────────────────────────────────────────────────────────
+
+def render_summary_tab(conn, selected_property):
+    summary = fetch_inspection_summary(conn, selected_property)
+    overview_df = fetch_property_overview(conn, selected_property)
+
+    if not summary:
+        st.warning("⚠️ No summary available yet.")
+        st.info("Run `backfill_risk_scores.py` once to generate summaries for existing data.")
+        return
+
+    row = overview_df.iloc[0] if not overview_df.empty else None
+
+    st.markdown("## 📝 Executive Summary Report")
+    if row is not None:
+        st.markdown(
+            f"**Property:** {row.get('address','N/A')}  |  "
+            f"**Grade:** {row['property_grade']}  |  "
+            f"**Score:** {row['property_risk_score']:.1f}/100"
+        )
+    st.markdown("---")
+
+    # Display summary with nice formatting
+    st.markdown(
+        f"""
+        <div style="background: rgba(0,245,255,0.05); border-left: 4px solid #00f5ff;
+                    padding: 20px; border-radius: 8px; line-height: 1.8;">
+            {summary}
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    st.markdown("---")
+    st.caption("This summary is AI-generated from inspection data and should be "
+               "verified by a qualified property inspector.")
+
+
+# ─────────────────────────────────────────────────────────────────
+# HOW TO WIRE IT ALL TOGETHER IN app.py
+# ─────────────────────────────────────────────────────────────────
+"""
+In the "View Existing Reports" section of app.py, your tabs block should look like:
+
+    tab1, tab2, tab3, tab4, tab5 = st.tabs([
+        "📊 Dashboard", "🤖 AI Detection", "🖼️ Annotated Images",
+        "📈 Risk Analysis", "📝 Summary Report"
+    ])
+
+    with tab1:
+        render_dashboard_tab(conn, selected_property)
+
+    with tab2:
+        # ... your existing AI Detection code (already works) ...
+
+    with tab3:
+        # ... your existing Annotated Images code ...
+
+    with tab4:
+        render_risk_tab(conn, selected_property)
+
+    with tab5:
+        render_summary_tab(conn, selected_property)
+
+That's the complete fix.  The key difference from the broken version:
+  - All queries now use MERGE (upsert) so data always stays in sync
+  - Column names are consistently lowercased with .str.lower()
+  - Tables are populated during inspection via save_all_risk_data()
+"""

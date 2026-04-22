@@ -14,6 +14,7 @@ from video_pdf_generator import generate_video_pdf_report
 from video_processor import VideoProcessor, save_uploaded_video, cleanup_temp_file, format_timestamp
 from translations import get_text
 from image_annotator import annotate_image_with_defects
+from save_risk_data import save_all_risk_data
 
 # ============================================
 # PAGE CONFIGURATION
@@ -853,6 +854,10 @@ if app_mode == "📸 New Inspection (Upload Images)":
                 conn.commit()
                 progress_bar.empty()
 
+                # ── Save risk scores & summary to Snowflake ──────────────────
+                with st.spinner("📊 Computing risk scores..."):
+                    save_all_risk_data(conn, property_id)
+
                 # CRITICAL: Store data for PDF generation with flags
                 if len(all_findings) > 0:
                     st.session_state.stored_property_data = {
@@ -1499,7 +1504,16 @@ elif app_mode == "📊 View Existing Reports":
                 st.plotly_chart(fig, use_container_width=True)
                 st.markdown('</div>', unsafe_allow_html=True)
             else:
-                st.info("No risk analysis data available for this property yet.")
+                st.warning("⚠️ No risk analysis data available for this property yet.")
+                st.info("This property has AI detections but risk scores haven't been computed. Click below to fix this.")
+                if st.button("🔧 Compute Risk Scores Now", type="primary", use_container_width=True):
+                    with st.spinner("Computing risk scores from existing detections..."):
+                        success = save_all_risk_data(conn, selected_property)
+                        if success:
+                            st.success("✅ Risk scores computed successfully!")
+                            st.rerun()
+                        else:
+                            st.error("❌ Failed. Check if this property has AI detections saved.")
 
         # TAB 2: AI DETECTION DETAILS
         with tab2:
@@ -1717,9 +1731,9 @@ elif app_mode == "📊 View Existing Reports":
                         'Severity': ['Critical', 'High', 'Medium', 'Low'],
                         'Count': [
                             int(risk_data['total_critical']),
-                            int(risk_data['total_high']),
-                            int(risk_data['total_medium']),
-                            int(risk_data['total_low'])
+                            int(risk_data.get('total_high', 0)),
+                            int(risk_data.get('total_medium', 0)),
+                            int(risk_data.get('total_low', 0))
                         ]
                     })
 
@@ -1795,7 +1809,12 @@ elif app_mode == "📊 View Existing Reports":
                     - Consider preventive maintenance plan
                     """)
             else:
-                st.info("No risk analysis data available yet.")
+                st.warning("⚠️ No risk analysis data available yet.")
+                if st.button("🔧 Compute Risk Scores Now", type="primary", use_container_width=True, key="risk_fix_btn"):
+                    with st.spinner("Computing risk scores..."):
+                        if save_all_risk_data(conn, selected_property):
+                            st.success("✅ Done! Refreshing...")
+                            st.rerun()
 
             st.markdown('</div>', unsafe_allow_html=True)
 
@@ -1852,9 +1871,9 @@ elif app_mode == "📊 View Existing Reports":
 
                 **Defects Found:**
                 - 🔴 Critical: {int(risk['total_critical'])}
-                - 🟠 High: {int(risk['total_high'])}
-                - 🟡 Medium: {int(risk['total_medium'])}
-                - 🟢 Low: {int(risk['total_low'])}
+                - 🟠 High: {int(risk.get('total_high', 0))}
+                - 🟡 Medium: {int(risk.get('total_medium', 0))}
+                - 🟢 Low: {int(risk.get('total_low', 0))}
                 - **Total:** {int(risk['total_defects'])}
 
                 **Rooms Inspected:** {int(risk['total_rooms'])}
@@ -2008,9 +2027,9 @@ Property Grade: {risk['property_grade']}
 
 DEFECTS SUMMARY
 Critical Issues: {int(risk['total_critical'])}
-High Priority: {int(risk['total_high'])}
-Medium Priority: {int(risk['total_medium'])}
-Low Priority: {int(risk['total_low'])}
+High Priority: {int(risk.get('total_high', 0))}
+Medium Priority: {int(risk.get('total_medium', 0))}
+Low Priority: {int(risk.get('total_low', 0))}
 Total Defects: {int(risk['total_defects'])}
 
 ROOMS ANALYZED
@@ -2030,7 +2049,12 @@ Powered by Defactra AI
                     use_container_width=True
                 )
             else:
-                st.info("No summary data available yet.")
+                st.warning("⚠️ No summary data available yet.")
+                if st.button("🔧 Compute Risk Scores Now", type="primary", use_container_width=True, key="summary_fix_btn"):
+                    with st.spinner("Computing risk scores..."):
+                        if save_all_risk_data(conn, selected_property):
+                            st.success("✅ Done! Refreshing...")
+                            st.rerun()
 
             st.markdown('</div>', unsafe_allow_html=True)
 

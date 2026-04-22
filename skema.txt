@@ -127,3 +127,12 @@ DESCRIBE TABLE findings;
 DESCRIBE TABLE property_risk_scores;
 DESCRIBE TABLE room_risk_scores;
 DESCRIBE TABLE inspection_summaries;
+-----------------------------------------------------
+ALTER TABLE property_risk_scores ADD COLUMN total_high INT DEFAULT 0;
+----------------------------------------------------------------------------
+UPDATE property_risk_scores p
+SET p.total_high = (
+    SELECT COALESCE(SUM(r.high_count), 0)
+    FROM room_risk_scores r
+    WHERE r.property_id = p.property_id
+);
