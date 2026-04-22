@@ -169,7 +169,14 @@ def save_all_risk_data(conn, property_id: str) -> bool:
         pid = property_id  # must be defined before room loop (already set above)
 
         # ── Property-level score ───────────────────────────────────────────
-        # After computing p_counts, pass it into both UPDATE and INSERT:
+        # Ensure required columns exist (safe to run repeatedly)
+        for col in ("total_high", "total_medium", "total_low"):
+            try:
+                cursor.execute(
+                    f"ALTER TABLE property_risk_scores ADD COLUMN {col} INT DEFAULT 0"
+                )
+            except Exception:
+                pass  # column already exists
 
         cursor.execute(
             """

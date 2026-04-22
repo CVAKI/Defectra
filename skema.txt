@@ -88,6 +88,9 @@ CREATE OR REPLACE TABLE property_risk_scores (
     property_risk_category  VARCHAR,        -- 'Low Risk' | 'Medium Risk' | 'High Risk'
     total_defects           INT DEFAULT 0,
     total_critical          INT DEFAULT 0,
+    total_high              INT DEFAULT 0,
+    total_medium            INT DEFAULT 0,
+    total_low               INT DEFAULT 0,
     high_risk_rooms         INT DEFAULT 0,
     total_rooms             INT DEFAULT 0
 );
